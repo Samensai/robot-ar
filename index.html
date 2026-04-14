@@ -137,18 +137,34 @@
       text-shadow:0 0 30px var(--cyan),0 0 60px rgba(0,245,255,0.3);
       margin-bottom:8px; text-align:center; }
     .splash-sub { font-size:13px; color:rgba(200,230,255,0.5); letter-spacing:.2em;
-      text-transform:uppercase; margin-bottom:40px; font-family:var(--font-mono); }
-    .splash-info { width:100%; max-width:320px; margin-bottom:40px; }
+      text-transform:uppercase; margin-bottom:32px; font-family:var(--font-mono); }
+    .splash-view { display:flex; flex-direction:column; align-items:center; width:100%; max-width:320px; }
+    .splash-info { width:100%; margin-bottom:32px; }
     .info-row { display:flex; align-items:flex-start; gap:14px; padding:10px 0;
       border-bottom:1px solid rgba(0,245,255,0.08); font-size:14px;
       line-height:1.5; color:rgba(200,230,255,0.7); }
     .info-icon { font-size:18px; flex-shrink:0; margin-top:2px; }
-    #btn-start { font-family:var(--font-mono); font-size:14px; letter-spacing:.15em;
-      color:var(--dark); background:var(--cyan); border:none; padding:14px 40px;
-      border-radius:2px; cursor:pointer; text-transform:uppercase;
+    .btn-splash-primary { font-family:var(--font-mono); font-size:14px; letter-spacing:.15em;
+      color:var(--dark); background:var(--cyan); border:none; padding:14px 0;
+      border-radius:2px; cursor:pointer; text-transform:uppercase; width:100%;
       box-shadow:0 0 20px rgba(0,245,255,0.4); transition:box-shadow .2s,transform .1s; }
-    #btn-start:active { transform:scale(0.97); }
-    .mode-note { margin-top:16px; font-size:11px; font-family:var(--font-mono);
+    .btn-splash-primary:active { transform:scale(0.97); }
+    .btn-splash-sec { font-family:var(--font-mono); font-size:13px; letter-spacing:.1em;
+      color:var(--cyan); background:none; border:1.5px solid rgba(0,245,255,0.25);
+      padding:12px 0; border-radius:2px; cursor:pointer; width:100%; margin-top:12px; }
+    .btn-splash-back { font-family:var(--font-mono); font-size:11px;
+      color:rgba(200,230,255,0.3); background:none; border:none;
+      cursor:pointer; margin-top:20px; letter-spacing:.1em; }
+    #room-code-display { font-family:var(--font-mono); font-size:48px; letter-spacing:.45em;
+      color:var(--cyan); text-shadow:0 0 30px var(--cyan),0 0 60px rgba(0,245,255,0.3);
+      padding:16px 20px; border:1px solid rgba(0,245,255,0.2); border-radius:4px;
+      margin:20px 0 28px; }
+    #code-input { font-family:var(--font-mono); font-size:30px; letter-spacing:.45em;
+      color:var(--cyan); background:rgba(0,0,0,0.5); border:1.5px solid rgba(0,245,255,0.35);
+      border-radius:4px; padding:16px 8px; width:100%; text-align:center;
+      text-transform:uppercase; outline:none; margin:20px 0 12px; caret-color:var(--cyan); }
+    #code-input::placeholder { color:rgba(0,245,255,0.18); letter-spacing:.3em; }
+    .mode-note { margin-top:0; margin-bottom:0; font-size:11px; font-family:var(--font-mono);
       color:rgba(200,230,255,0.3); text-align:center; max-width:280px; line-height:1.6; }
   </style>
 </head>
@@ -213,14 +229,36 @@
   <div id="splash">
     <div class="splash-title">ROBOT::AR</div>
     <div class="splash-sub">Prototype v0.2 — Modulaire</div>
-    <div class="splash-info">
-      <div class="info-row"><span class="info-icon">🕹️</span><span>Joystick pour déplacer le robot</span></div>
-      <div class="info-row"><span class="info-icon">👆</span><span>Tap sur une pièce pour la sélectionner et la changer</span></div>
-      <div class="info-row"><span class="info-icon">🤖</span><span>3 catégories : roues, corps, avant</span></div>
-      <div class="info-row"><span class="info-icon">📱</span><span>AR réelle sur Android Chrome</span></div>
+
+    <!-- Vue 1 : menu principal -->
+    <div class="splash-view" id="view-menu">
+      <div class="splash-info">
+        <div class="info-row"><span class="info-icon">🕹️</span><span>Joystick pour déplacer le robot</span></div>
+        <div class="info-row"><span class="info-icon">📡</span><span>Gyroscope pour tourner la caméra</span></div>
+        <div class="info-row"><span class="info-icon">👆</span><span>Tap sur une pièce pour la changer</span></div>
+        <div class="info-row"><span class="info-icon">🤝</span><span>2 joueurs dans la même arène</span></div>
+      </div>
+      <button class="btn-splash-primary" id="btn-create">[ CRÉER UNE PARTIE ]</button>
+      <button class="btn-splash-sec" id="btn-show-join">Rejoindre une partie →</button>
     </div>
-    <button id="btn-start">[ DÉMARRER ]</button>
-    <p class="mode-note">Nécessite l'accès caméra pour le mode AR.</p>
+
+    <!-- Vue 2 : créer → afficher le code -->
+    <div class="splash-view" id="view-create" style="display:none">
+      <p class="mode-note">Partage ce code avec l'autre joueur</p>
+      <div id="room-code-display">—</div>
+      <button class="btn-splash-primary" id="btn-start-create">[ DÉMARRER ]</button>
+      <button class="btn-splash-back" id="btn-back-create">← Retour</button>
+    </div>
+
+    <!-- Vue 3 : rejoindre → entrer le code -->
+    <div class="splash-view" id="view-join" style="display:none">
+      <p class="mode-note">Entre le code de la partie</p>
+      <input id="code-input" type="text" maxlength="5"
+             inputmode="text" autocapitalize="characters"
+             autocomplete="off" spellcheck="false" placeholder="XXXXX"/>
+      <button class="btn-splash-primary" id="btn-start-join">[ REJOINDRE ]</button>
+      <button class="btn-splash-back" id="btn-back-join">← Retour</button>
+    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -272,14 +310,13 @@
   });
   const db = firebase.database();
 
-  // Room : récupérer depuis l'URL ou en générer un nouveau
-  const roomId = (() => {
-    const p = new URLSearchParams(location.search).get('room');
-    if (p) return p;
-    const code = Math.random().toString(36).substr(2,5).toUpperCase();
-    history.replaceState(null, '', '?room=' + code);
-    return code;
-  })();
+  // Room : défini quand le joueur crée ou rejoint une partie
+  let roomId = null;
+
+  const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O/1/I/L
+  function genCode() {
+    return Array.from({length:5}, ()=>CHARS[Math.floor(Math.random()*CHARS.length)]).join('');
+  }
 
   // Identité du joueur local (persistée en session)
   let myId = sessionStorage.getItem('robotar_pid');
@@ -289,9 +326,15 @@
   let lastPublish = 0;
 
   function copyInvite() {
-    const url = location.origin + location.pathname + '?room=' + roomId;
-    navigator.clipboard?.writeText(url).then(() => dbgLog('Lien copié !', '#88ff88'))
-      .catch(() => { prompt('Copie ce lien :', url); });
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,8,16,0.96);gap:12px;padding:32px;';
+    ov.innerHTML = `
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:rgba(0,245,255,0.45);letter-spacing:.2em;margin-bottom:4px;">CODE DE PARTIE</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:52px;color:#00f5ff;letter-spacing:.45em;text-shadow:0 0 30px #00f5ff;padding:16px 20px;border:1px solid rgba(0,245,255,0.2);border-radius:4px;">${roomId}</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(200,230,255,0.35);text-align:center;max-width:260px;line-height:1.8;margin-top:4px;">L'autre joueur ouvre l'app et<br>entre ce code via "Rejoindre une partie"</div>
+      <button onclick="this.parentElement.remove()" style="font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:.1em;color:#0a0a0f;background:#00f5ff;border:none;padding:12px 32px;border-radius:2px;cursor:pointer;margin-top:12px;">[ FERMER ]</button>
+    `;
+    document.body.appendChild(ov);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -1250,7 +1293,45 @@
     move.rotY=(keys['e'])?1:(keys['r'])?-1:0;
   }
 
-  $('btn-start').addEventListener('click',start);
+  // ── Navigation du splash ─────────────────────
+  $('btn-create').addEventListener('click', () => {
+    roomId = genCode();
+    $('room-code-display').textContent = roomId;
+    $('view-menu').style.display  = 'none';
+    $('view-create').style.display = 'flex';
+  });
+
+  $('btn-show-join').addEventListener('click', () => {
+    $('view-menu').style.display = 'none';
+    $('view-join').style.display  = 'flex';
+    setTimeout(() => $('code-input').focus(), 100);
+  });
+
+  $('btn-start-create').addEventListener('click', start);
+
+  $('btn-start-join').addEventListener('click', () => {
+    const code = $('code-input').value.trim().toUpperCase();
+    if (code.length < 3) { $('code-input').style.borderColor='#ff4444'; return; }
+    roomId = code;
+    start();
+  });
+
+  $('code-input').addEventListener('input', e => {
+    e.target.value = e.target.value.toUpperCase();
+    e.target.style.borderColor = '';
+  });
+  $('code-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') $('btn-start-join').click();
+  });
+
+  $('btn-back-create').addEventListener('click', () => {
+    $('view-create').style.display = 'none';
+    $('view-menu').style.display   = 'flex';
+  });
+  $('btn-back-join').addEventListener('click', () => {
+    $('view-join').style.display = 'none';
+    $('view-menu').style.display  = 'flex';
+  });
 
   // Service Worker
   if('serviceWorker' in navigator){
