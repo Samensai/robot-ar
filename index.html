@@ -685,34 +685,58 @@
     const arOk = await startAR();
 
     if (!arOk) {
-      // Fallback: 3D mode with gyro
       mode = '3d';
       setStatus('MODE 3D', 'active');
       robotPlaced = true;
-
-      // Try gyro
-      if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', onGyro, true);
-      }
-
-      // Simple orbit-like background
       scene.background = new THREE.Color(0x050810);
       scene.fog = new THREE.FogExp2(0x050810, 0.08);
+      await requestGyro();
     }
 
     renderer.setAnimationLoop(onFrame);
   }
 
-  // ── Gyro (3D fallback) ───────────────────────
-  let gyroAlpha = 0;
+  // ── Gyro permission (iOS 13+) ─────────────────
+  async function requestGyro() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,15,0.93);gap:16px;padding:32px;';
+      overlay.innerHTML = `
+        <div style="font-family:'Share Tech Mono',monospace;color:#00f5ff;font-size:13px;letter-spacing:.15em;text-align:center;">ACCÈS GYROSCOPE</div>
+        <div style="font-size:13px;color:rgba(200,230,255,0.6);text-align:center;line-height:1.7;max-width:260px;">iOS nécessite votre autorisation pour incliner la vue avec le téléphone.</div>
+        <button id="btn-gyro-ok" style="font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:.12em;color:#0a0a0f;background:#00f5ff;border:none;padding:13px 36px;border-radius:2px;cursor:pointer;margin-top:8px;box-shadow:0 0 18px rgba(0,245,255,0.4);">[ AUTORISER ]</button>
+        <button id="btn-gyro-skip" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(200,230,255,0.35);background:none;border:none;cursor:pointer;">passer sans gyroscope</button>
+      `;
+      document.body.appendChild(overlay);
+      await new Promise(resolve => {
+        document.getElementById('btn-gyro-ok').addEventListener('click', async () => {
+          try {
+            const result = await DeviceOrientationEvent.requestPermission();
+            if (result === 'granted') {
+              window.addEventListener('deviceorientation', onGyro, true);
+              setStatus('GYRO OK', 'active');
+            }
+          } catch(e) { console.warn('Gyro denied', e); }
+          overlay.remove(); resolve();
+        });
+        document.getElementById('btn-gyro-skip').addEventListener('click', () => { overlay.remove(); resolve(); });
+      });
+    } else if (window.DeviceOrientationEvent) {
+      // Android / older iOS — pas de permission nécessaire
+      window.addEventListener('deviceorientation', onGyro, true);
+    }
+  }
+
+  // ── Gyro handler ─────────────────────────────
+  let gyroBaseBeta = null;
   function onGyro(e) {
-    if (e.beta !== null) {
-      const tilt = THREE.MathUtils.clamp(e.beta - 45, -30, 30);
-      camera.position.y = 1.6 + tilt * 0.015;
-    }
-    if (e.alpha !== null) {
-      gyroAlpha = e.alpha;
-    }
+    if (e.beta === null || e.gamma === null) return;
+    if (gyroBaseBeta === null) gyroBaseBeta = e.beta;
+    const tiltFwd = THREE.MathUtils.clamp(e.beta - 70, -40, 40);
+    const tiltSide = THREE.MathUtils.clamp(e.gamma, -30, 30);
+    camera.position.y = 1.6 - tiltFwd * 0.018;
+    camera.position.x += (tiltSide * 0.012 - camera.position.x) * 0.08;
   }
 
   // ── AR place ─────────────────────────────────
