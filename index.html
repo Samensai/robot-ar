@@ -313,6 +313,50 @@
       border-color: rgba(0,245,255,0.6);
     }
 
+    /* AR Quick Look link */
+    #ar-quicklook-btn {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: var(--dark);
+      background: var(--orange);
+      border: none;
+      padding: 12px 24px;
+      border-radius: 2px;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 0 16px rgba(255,107,43,0.4);
+      white-space: nowrap;
+    }
+
+    /* Export toast */
+    #export-toast {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan);
+      line-height: 1.8;
+      text-align: center;
+      max-width: 280px;
+      white-space: pre-line;
+      backdrop-filter: blur(8px);
+    }
+
     /* ── ROBOT STATS HUD ── */
     #stats-hud {
       position: fixed;
@@ -421,7 +465,19 @@
     <button class="ctrl-btn" id="btn-reset">↺ RESET</button>
     <button class="ctrl-btn" id="btn-rotate-l">⟲ ROT L</button>
     <button class="ctrl-btn" id="btn-rotate-r">ROT R ⟳</button>
+    <button class="ctrl-btn" id="btn-export-glb">⬇ GLB</button>
   </div>
+
+  <!-- AR Quick Look link (Safari iOS only, shown when USDZ is available) -->
+  <a id="ar-quicklook-btn"
+     rel="ar"
+     href="robot.usdz">
+    <img src="" style="display:none" alt=""/>
+    📱 VOIR EN AR (iPhone)
+  </a>
+
+  <!-- Export instructions toast -->
+  <div id="export-toast"></div>
 
   <!-- Splash screen -->
   <div id="splash">
@@ -915,6 +971,61 @@
 
   // ── Start button ─────────────────────────────
   $('btn-start').addEventListener('click', start);
+
+  // ── GLB Export ───────────────────────────────
+  function loadGLBExporter(cb) {
+    // Three.js GLTFExporter (r128 compatible via CDN)
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js';
+    s.onload = cb;
+    document.head.appendChild(s);
+  }
+
+  function exportGLB() {
+    const toast = $('export-toast');
+    toast.style.display = 'block';
+    toast.textContent = 'Chargement de l\'exporteur...';
+
+    loadGLBExporter(() => {
+      toast.textContent = 'Export en cours...';
+      const exporter = new THREE.GLTFExporter();
+      exporter.parse(robotGroup, result => {
+        const blob = new Blob([result], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'robot.glb';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        toast.textContent = 'robot.glb téléchargé !\n\nÉtape suivante :\n1. Va sur usd.encountered.com\n2. Upload robot.glb\n3. Télécharge robot.usdz\n4. Mets-le dans ton repo GitHub\n\nAppuie pour fermer';
+        toast.style.cursor = 'pointer';
+        toast.onclick = () => { toast.style.display = 'none'; };
+      }, { binary: true });
+    });
+  }
+
+  $('btn-export-glb').addEventListener('click', exportGLB);
+
+  // ── AR Quick Look detection ───────────────────
+  // Sur Safari iOS, si robot.usdz existe dans le repo, on affiche le bouton
+  // Le lien avec rel="ar" est automatiquement intercepté par Safari
+  function checkUSDZ() {
+    fetch('/robot-ar/robot.usdz', { method: 'HEAD' })
+      .then(r => {
+        if (r.ok) {
+          $('ar-quicklook-btn').style.display = 'block';
+          // Masquer le bouton placer si on est en mode non-AR
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          if (isIOS) {
+            $('ar-quicklook-btn').style.display = 'block';
+          }
+        }
+      })
+      .catch(() => {});
+  }
+  // Vérifier après le démarrage
+  setTimeout(checkUSDZ, 2000);
 
   // ── Keyboard (desktop dev) ────────────────────
   const keys = {};
