@@ -270,7 +270,8 @@
   const SPEED = 0.04, ROT_SPEED = 0.04, ROT_SMOOTH = 0.18;
 
   // Caméra fixe + gyro (quaternion approach)
-  const CAM_FIXED = { x:0, y:2.5, z:5 };
+  const CAM_FIXED = { x:0, y:4.5, z:8 };
+  const ARENA = 4; // demi-côté de l'arène (arène = 8×8)
   let camYaw = 0, gyroActive = false;
   // Helpers gyro — alloués une seule fois
   const _devQuat  = new THREE.Quaternion();
@@ -688,6 +689,57 @@
   }, { passive: true });
 
   // ═══════════════════════════════════════════════
+  //  ARÈNE
+  // ═══════════════════════════════════════════════
+
+  function buildArena() {
+    const H = ARENA, wallH = 0.8, wallT = 0.12;
+
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: 0x0d1f2d, metalness: 0.75, roughness: 0.4,
+      transparent: true, opacity: 0.92
+    });
+    const stripMat = new THREE.MeshStandardMaterial({
+      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.7,
+      metalness: 0.9, roughness: 0.1
+    });
+
+    // 4 murs : [posX, posZ, largeur, profondeur]
+    const walls = [
+      [0, -H, H*2 + wallT*2, wallT],  // Nord
+      [0,  H, H*2 + wallT*2, wallT],  // Sud
+      [-H, 0, wallT, H*2],             // Ouest
+      [ H, 0, wallT, H*2],             // Est
+    ];
+    walls.forEach(([px, pz, w, d]) => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), wallMat.clone());
+      wall.position.set(px, wallH / 2, pz);
+      wall.castShadow = true; wall.receiveShadow = true;
+      scene.add(wall);
+      // Strip lumineux sur le dessus
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.025, d), stripMat);
+      strip.position.set(px, wallH + 0.013, pz);
+      scene.add(strip);
+    });
+
+    // Piliers d'angle
+    [[-H,-H],[H,-H],[-H,H],[H,H]].forEach(([x, z]) => {
+      const p = new THREE.Mesh(
+        new THREE.BoxGeometry(wallT*2.2, wallH + 0.1, wallT*2.2),
+        wallMat.clone()
+      );
+      p.position.set(x, (wallH + 0.1) / 2, z);
+      scene.add(p);
+      const cap = new THREE.Mesh(
+        new THREE.BoxGeometry(wallT*2.6, 0.04, wallT*2.6),
+        stripMat
+      );
+      cap.position.set(x, wallH + 0.12, z);
+      scene.add(cap);
+    });
+  }
+
+  // ═══════════════════════════════════════════════
   //  THREE.JS INIT
   // ═══════════════════════════════════════════════
 
@@ -717,16 +769,17 @@
     fillLight.position.set(-4, 2, -4);
     scene.add(fillLight);
 
-    // Sol + grille (mode 3D)
-    const grid = new THREE.GridHelper(10,20,0x003344,0x001a22);
+    // Sol + grille
+    const grid = new THREE.GridHelper(ARENA*2, ARENA*2, 0x004455, 0x001a22);
     grid.name = 'grid'; scene.add(grid);
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(20,20),
-      new THREE.MeshStandardMaterial({color:0x050810,roughness:1})
+      new THREE.PlaneGeometry(ARENA*2, ARENA*2),
+      new THREE.MeshStandardMaterial({ color:0x050c12, roughness:1, metalness:0.1 })
     );
     ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; ground.name = 'ground';
     scene.add(ground);
 
+    buildArena();
     buildRobot();
     window.addEventListener('resize', onResize);
   }
@@ -919,6 +972,11 @@
         const da = Math.atan2(Math.sin(targetRy - robotPos.ry), Math.cos(targetRy - robotPos.ry));
         robotPos.ry += da * ROT_SMOOTH;
       }
+
+      // Collision murs de l'arène
+      const limit = ARENA - 0.32;
+      robotPos.x = THREE.MathUtils.clamp(robotPos.x, -limit, limit);
+      robotPos.z = THREE.MathUtils.clamp(robotPos.z, -limit, limit);
 
       robotGroup.position.x = robotPos.x;
       robotGroup.position.z = robotPos.z;
