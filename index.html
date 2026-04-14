@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#0a0a0f"/>
+  <title>ROBOT AR — Prototype</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00f5ff;
+      --orange: #ff6b2b;
+      --dark: #0a0a0f;
+      --panel: rgba(10,10,20,0.85);
+      --border: rgba(0,245,255,0.25);
+      --text: #c8e6ff;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-ui: 'Rajdhani', sans-serif;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--dark);
+      overflow: hidden;
+      font-family: var(--font-ui);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+
+    /* ── SCAN LINES overlay ── */
+    #canvas-container::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* ── HUD TOP ── */
+    #hud-top {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 20;
+      padding: 14px 20px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+    }
+
+    #logo {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--cyan);
+      letter-spacing: 0.15em;
+      text-shadow: 0 0 12px var(--cyan);
+    }
+
+    #status-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      background: var(--panel);
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #aaa;
+      transition: background 0.3s;
+    }
+
+    #status-dot.active { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+    #status-dot.ar { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+    #status-dot.error { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+
+    /* ── SPLASH / INSTRUCTIONS ── */
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--dark);
+      padding: 32px;
+      transition: opacity 0.6s, visibility 0.6s;
+    }
+
+    #splash.hidden { opacity: 0; visibility: hidden; }
+
+    .splash-title {
+      font-family: var(--font-mono);
+      font-size: clamp(28px, 8vw, 48px);
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(0,245,255,0.3);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .splash-sub {
+      font-size: 13px;
+      color: rgba(200,230,255,0.5);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 48px;
+      font-family: var(--font-mono);
+    }
+
+    .splash-info {
+      width: 100%;
+      max-width: 320px;
+      margin-bottom: 40px;
+    }
+
+    .info-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(0,245,255,0.08);
+      font-size: 14px;
+      line-height: 1.5;
+      color: rgba(200,230,255,0.7);
+    }
+
+    .info-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    #btn-start {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: 0.15em;
+      color: var(--dark);
+      background: var(--cyan);
+      border: none;
+      padding: 14px 40px;
+      border-radius: 2px;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 0 20px rgba(0,245,255,0.4);
+      transition: box-shadow 0.2s, transform 0.1s;
+    }
+
+    #btn-start:active { transform: scale(0.97); box-shadow: 0 0 8px rgba(0,245,255,0.2); }
+
+    .mode-note {
+      margin-top: 16px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: rgba(200,230,255,0.3);
+      text-align: center;
+      max-width: 280px;
+      line-height: 1.6;
+    }
+
+    /* ── AR hint ── */
+    #ar-hint {
+      position: fixed;
+      bottom: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: rgba(0,245,255,0.7);
+      letter-spacing: 0.1em;
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 0.5s;
+      text-shadow: 0 0 8px var(--cyan);
+    }
+
+    #ar-hint.hidden { opacity: 0; }
+
+    /* ── RETICLE hint ── */
+    #reticle-hint {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 15;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    #reticle-hint.hidden { opacity: 0; }
+
+    .reticle-ring {
+      width: 48px; height: 48px;
+      border: 1.5px solid rgba(0,245,255,0.6);
+      border-radius: 50%;
+      position: relative;
+      animation: pulse-ring 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+
+    .reticle-cross::before, .reticle-cross::after {
+      content: '';
+      position: absolute;
+      background: rgba(0,245,255,0.6);
+      top: 50%; left: 50%;
+    }
+
+    .reticle-cross::before {
+      width: 1px; height: 20px;
+      transform: translate(-50%, -50%);
+    }
+
+    .reticle-cross::after {
+      width: 20px; height: 1px;
+      transform: translate(-50%, -50%);
+    }
+
+    /* ── JOYSTICK ── */
+    #joystick-zone {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      z-index: 30;
+      touch-action: none;
+    }
+
+    #joystick-base {
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      border: 1.5px solid rgba(0,245,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      backdrop-filter: blur(8px);
+    }
+
+    #joystick-thumb {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(0,245,255,0.6), rgba(0,245,255,0.15));
+      border: 1.5px solid rgba(0,245,255,0.5);
+      position: absolute;
+      transition: transform 0.05s;
+      box-shadow: 0 0 12px rgba(0,245,255,0.3);
+    }
+
+    /* ── RIGHT CONTROLS ── */
+    #controls-right {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .ctrl-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--cyan);
+      background: rgba(0,0,0,0.5);
+      border: 1.5px solid rgba(0,245,255,0.2);
+      border-radius: 4px;
+      padding: 10px 16px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: background 0.15s, border-color 0.15s;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .ctrl-btn:active, .ctrl-btn.active {
+      background: rgba(0,245,255,0.15);
+      border-color: rgba(0,245,255,0.6);
+    }
+
+    /* ── ROBOT STATS HUD ── */
+    #stats-hud {
+      position: fixed;
+      top: 60px;
+      right: 16px;
+      z-index: 20;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(0,245,255,0.6);
+      text-align: right;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+
+    .stat-label { color: rgba(0,245,255,0.35); }
+
+    /* ── PLACE BTN ── */
+    #btn-place {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: var(--dark);
+      background: var(--cyan);
+      border: none;
+      padding: 12px 32px;
+      border-radius: 2px;
+      cursor: pointer;
+      box-shadow: 0 0 16px rgba(0,245,255,0.4);
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    #btn-place.hidden { opacity: 0; visibility: hidden; }
+
+    /* ── CORNER DECORATION ── */
+    .corner {
+      position: fixed;
+      z-index: 15;
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+    }
+
+    .corner-tl { top: 8px; left: 8px; border-top: 1px solid var(--cyan); border-left: 1px solid var(--cyan); opacity: 0.4; }
+    .corner-tr { top: 8px; right: 8px; border-top: 1px solid var(--cyan); border-right: 1px solid var(--cyan); opacity: 0.4; }
+    .corner-bl { bottom: 8px; left: 8px; border-bottom: 1px solid var(--cyan); border-left: 1px solid var(--cyan); opacity: 0.4; }
+    .corner-br { bottom: 8px; right: 8px; border-bottom: 1px solid var(--cyan); border-right: 1px solid var(--cyan); opacity: 0.4; }
+  </style>
+</head>
+<body>
+
+  <!-- Corner decorations -->
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <!-- Canvas -->
+  <div id="canvas-container">
+    <canvas id="main-canvas"></canvas>
+  </div>
+
+  <!-- HUD Top -->
+  <div id="hud-top">
+    <div id="logo">ROBOT::AR</div>
+    <div id="status-badge">
+      <div id="status-dot"></div>
+      <span id="status-text">INIT</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats-hud">
+    <div><span class="stat-label">POS X </span><span id="stat-x">0.00</span></div>
+    <div><span class="stat-label">POS Z </span><span id="stat-z">0.00</span></div>
+    <div><span class="stat-label">ROT   </span><span id="stat-r">0°</span></div>
+    <div><span class="stat-label">MODE  </span><span id="stat-mode">—</span></div>
+  </div>
+
+  <!-- AR reticle hint -->
+  <div id="reticle-hint" class="hidden">
+    <div class="reticle-ring">
+      <div class="reticle-cross"></div>
+    </div>
+  </div>
+
+  <!-- AR instructions -->
+  <div id="ar-hint" class="hidden">POINTER VERS UNE SURFACE PLANE</div>
+
+  <!-- Place button (AR mode) -->
+  <button id="btn-place" class="hidden">[ PLACER LE ROBOT ]</button>
+
+  <!-- Joystick -->
+  <div id="joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-thumb"></div>
+    </div>
+  </div>
+
+  <!-- Right controls -->
+  <div id="controls-right">
+    <button class="ctrl-btn" id="btn-reset">↺ RESET</button>
+    <button class="ctrl-btn" id="btn-rotate-l">⟲ ROT L</button>
+    <button class="ctrl-btn" id="btn-rotate-r">ROT R ⟳</button>
+  </div>
+
+  <!-- Splash screen -->
+  <div id="splash">
+    <div class="splash-title">ROBOT::AR</div>
+    <div class="splash-sub">Prototype v0.1 — Solo</div>
+
+    <div class="splash-info">
+      <div class="info-row">
+        <span class="info-icon">🕹️</span>
+        <span>Joystick virtuel (gauche) pour déplacer votre robot dans l'espace</span>
+      </div>
+      <div class="info-row">
+        <span class="info-icon">🔄</span>
+        <span>Boutons droite pour pivoter le robot</span>
+      </div>
+      <div class="info-row">
+        <span class="info-icon">📱</span>
+        <span>Sur Android Chrome : détection de surface réelle via la caméra</span>
+      </div>
+      <div class="info-row">
+        <span class="info-icon">🌐</span>
+        <span>Sur iPhone Safari : mode 3D avec gyroscope (WebXR AR non supporté)</span>
+      </div>
+    </div>
+
+    <button id="btn-start">[ DÉMARRER ]</button>
+    <p class="mode-note">Nécessite l'accès caméra pour le mode AR.<br>Mode 3D disponible sans caméra.</p>
+  </div>
+
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+  // ─────────────────────────────────────────────
+  //  ROBOT AR — Core Engine
+  // ─────────────────────────────────────────────
+
+  const $ = id => document.getElementById(id);
+
+  let scene, camera, renderer, clock;
+  let robot, robotGroup, groundPlane;
+  let mixer, animFrame;
+  let mode = 'loading'; // 'ar' | '3d'
+  let robotPlaced = false;
+
+  // AR specifics
+  let xrSession = null, xrRefSpace = null, xrHitTestSource = null;
+  let reticleGroup = null;
+
+  // Movement state
+  const move = { x: 0, z: 0, rotY: 0 };
+  const robotPos = { x: 0, z: 0, ry: 0 };
+  const SPEED = 0.04, ROT_SPEED = 0.04;
+
+  // ── Status helpers ────────────────────────────
+  function setStatus(label, state) {
+    $('status-text').textContent = label;
+    const dot = $('status-dot');
+    dot.className = 'status-dot';
+    if (state) dot.classList.add(state);
+    if (state === 'ar') $('stat-mode').textContent = 'AR';
+    if (state === 'active') $('stat-mode').textContent = '3D';
+  }
+
+  // ── Three.js init ─────────────────────────────
+  function initThree() {
+    clock = new THREE.Clock();
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+    camera.position.set(0, 1.6, 2);
+    camera.lookAt(0, 0.2, 0);
+
+    renderer = new THREE.WebGLRenderer({
+      canvas: $('main-canvas'),
+      antialias: true,
+      alpha: true,
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.xr.enabled = true;
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0x8888bb, 0.8);
+    scene.add(ambient);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(3, 6, 4);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    scene.add(dirLight);
+
+    const rimLight = new THREE.DirectionalLight(0x00f5ff, 0.4);
+    rimLight.position.set(-4, 2, -4);
+    scene.add(rimLight);
+
+    // Ground (3D mode only)
+    const gridHelper = new THREE.GridHelper(10, 20, 0x003344, 0x001a22);
+    gridHelper.name = 'grid';
+    scene.add(gridHelper);
+
+    groundPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.MeshStandardMaterial({ color: 0x050810, roughness: 1 })
+    );
+    groundPlane.rotation.x = -Math.PI / 2;
+    groundPlane.receiveShadow = true;
+    groundPlane.name = 'ground';
+    scene.add(groundPlane);
+
+    // Build robot
+    buildRobot();
+
+    window.addEventListener('resize', onResize);
+  }
+
+  // ── Robot construction ────────────────────────
+  function buildRobot() {
+    robotGroup = new THREE.Group();
+    robotGroup.name = 'robot';
+
+    const matBody = new THREE.MeshStandardMaterial({
+      color: 0x1a2a3a, metalness: 0.7, roughness: 0.3
+    });
+    const matAccent = new THREE.MeshStandardMaterial({
+      color: 0x00f5ff, metalness: 0.9, roughness: 0.1,
+      emissive: 0x003344, emissiveIntensity: 0.5
+    });
+    const matWheel = new THREE.MeshStandardMaterial({
+      color: 0x111111, metalness: 0.3, roughness: 0.8
+    });
+    const matOrange = new THREE.MeshStandardMaterial({
+      color: 0xff6b2b, metalness: 0.6, roughness: 0.2,
+      emissive: 0x331100, emissiveIntensity: 0.4
+    });
+
+    // ── Body (chassis)
+    const bodyGeo = new THREE.BoxGeometry(0.28, 0.12, 0.36);
+    const body = new THREE.Mesh(bodyGeo, matBody);
+    body.position.y = 0.1;
+    body.castShadow = true;
+    robotGroup.add(body);
+
+    // ── Top plate
+    const topGeo = new THREE.BoxGeometry(0.24, 0.02, 0.30);
+    const top = new THREE.Mesh(topGeo, matAccent);
+    top.position.y = 0.17;
+    robotGroup.add(top);
+
+    // ── Wedge front
+    const wGeo = new THREE.CylinderGeometry(0.01, 0.14, 0.04, 4);
+    const wedge = new THREE.Mesh(wGeo, matOrange);
+    wedge.position.set(0, 0.06, 0.2);
+    wedge.rotation.y = Math.PI / 4;
+    robotGroup.add(wedge);
+
+    // ── Wheels (4x)
+    const wheelGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.05, 16);
+    const wheelPositions = [
+      [-0.165, 0.07, 0.12], [0.165, 0.07, 0.12],
+      [-0.165, 0.07, -0.12], [0.165, 0.07, -0.12]
+    ];
+    wheelPositions.forEach(p => {
+      const w = new THREE.Mesh(wheelGeo, matWheel);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(...p);
+      w.castShadow = true;
+      w.name = 'wheel';
+      robotGroup.add(w);
+
+      // Wheel rim
+      const rimGeo = new THREE.TorusGeometry(0.055, 0.008, 6, 16);
+      const rim = new THREE.Mesh(rimGeo, matAccent);
+      rim.position.set(...p);
+      robotGroup.add(rim);
+    });
+
+    // ── Antenna
+    const antGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.12, 6);
+    const ant = new THREE.Mesh(antGeo, matAccent);
+    ant.position.set(-0.06, 0.24, -0.08);
+    robotGroup.add(ant);
+
+    const antTopGeo = new THREE.SphereGeometry(0.015, 8, 8);
+    const antTop = new THREE.Mesh(antTopGeo, matOrange);
+    antTop.position.set(-0.06, 0.305, -0.08);
+    robotGroup.add(antTop);
+
+    // ── Eye sensor strip
+    const eyeGeo = new THREE.BoxGeometry(0.18, 0.025, 0.01);
+    const eye = new THREE.Mesh(eyeGeo, matAccent);
+    eye.position.set(0, 0.14, 0.19);
+    robotGroup.add(eye);
+
+    robotGroup.position.set(0, 0, 0);
+    scene.add(robotGroup);
+  }
+
+  // ── AR reticle ────────────────────────────────
+  function buildReticle() {
+    reticleGroup = new THREE.Group();
+    const geo = new THREE.RingGeometry(0.1, 0.12, 32);
+    geo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00f5ff, side: THREE.DoubleSide });
+    reticleGroup.add(new THREE.Mesh(geo, mat));
+    reticleGroup.visible = false;
+    scene.add(reticleGroup);
+  }
+
+  // ── WebXR AR session ──────────────────────────
+  async function startAR() {
+    if (!navigator.xr) return false;
+    const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+    if (!supported) return false;
+
+    try {
+      xrSession = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+      });
+
+      renderer.xr.setReferenceSpaceType('local');
+      await renderer.xr.setSession(xrSession);
+
+      xrRefSpace = await xrSession.requestReferenceSpace('viewer');
+      xrHitTestSource = await xrSession.requestHitTestSource({ space: xrRefSpace });
+
+      xrSession.addEventListener('end', () => {
+        xrHitTestSource = null;
+        xrSession = null;
+      });
+
+      // Hide 3D ground
+      scene.getObjectByName('grid').visible = false;
+      scene.getObjectByName('ground').visible = false;
+      robotGroup.visible = false;
+
+      buildReticle();
+      $('reticle-hint').classList.remove('hidden');
+      $('ar-hint').classList.remove('hidden');
+      $('btn-place').classList.remove('hidden');
+
+      setStatus('AR ACTIF', 'ar');
+      mode = 'ar';
+      return true;
+    } catch (e) {
+      console.warn('AR session failed:', e);
+      return false;
+    }
+  }
+
+  // ── Start sequence ────────────────────────────
+  async function start() {
+    $('splash').classList.add('hidden');
+    initThree();
+
+    const arOk = await startAR();
+
+    if (!arOk) {
+      // Fallback: 3D mode with gyro
+      mode = '3d';
+      setStatus('MODE 3D', 'active');
+      robotPlaced = true;
+
+      // Try gyro
+      if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientation', onGyro, true);
+      }
+
+      // Simple orbit-like background
+      scene.background = new THREE.Color(0x050810);
+      scene.fog = new THREE.FogExp2(0x050810, 0.08);
+    }
+
+    renderer.setAnimationLoop(onFrame);
+  }
+
+  // ── Gyro (3D fallback) ───────────────────────
+  let gyroAlpha = 0;
+  function onGyro(e) {
+    if (e.beta !== null) {
+      const tilt = THREE.MathUtils.clamp(e.beta - 45, -30, 30);
+      camera.position.y = 1.6 + tilt * 0.015;
+    }
+    if (e.alpha !== null) {
+      gyroAlpha = e.alpha;
+    }
+  }
+
+  // ── AR place ─────────────────────────────────
+  $('btn-place').addEventListener('click', () => {
+    if (reticleGroup && reticleGroup.visible) {
+      robotGroup.position.copy(reticleGroup.position);
+      robotGroup.visible = true;
+      robotPlaced = true;
+      $('btn-place').classList.add('hidden');
+      $('reticle-hint').classList.add('hidden');
+      $('ar-hint').classList.add('hidden');
+    }
+  });
+
+  // ── Main loop ─────────────────────────────────
+  function onFrame(time, frame) {
+    const dt = clock.getDelta();
+
+    // AR hit-test
+    if (mode === 'ar' && frame && xrHitTestSource) {
+      const hits = frame.getHitTestResults(xrHitTestSource);
+      if (hits.length) {
+        const pose = hits[0].getPose(renderer.xr.getReferenceSpace());
+        reticleGroup.visible = true;
+        reticleGroup.matrix.fromArray(pose.transform.matrix);
+        reticleGroup.matrix.decompose(
+          reticleGroup.position,
+          reticleGroup.quaternion,
+          reticleGroup.scale
+        );
+      } else {
+        reticleGroup.visible = false;
+      }
+    }
+
+    // Move robot
+    if (robotPlaced) {
+      const spd = SPEED * (1 + Math.abs(move.x) * 0.5);
+      // Move relative to robot facing direction
+      const fwd = new THREE.Vector3(
+        Math.sin(robotPos.ry),
+        0,
+        Math.cos(robotPos.ry)
+      );
+      const right = new THREE.Vector3(
+        Math.cos(robotPos.ry),
+        0,
+        -Math.sin(robotPos.ry)
+      );
+
+      robotPos.x += (fwd.x * (-move.z) + right.x * move.x) * spd;
+      robotPos.z += (fwd.z * (-move.z) + right.z * move.x) * spd;
+      robotPos.ry += move.rotY * ROT_SPEED;
+
+      robotGroup.position.x = robotPos.x;
+      robotGroup.position.z = robotPos.z;
+      robotGroup.rotation.y = robotPos.ry;
+
+      // Animate wheels
+      const wheelSpeed = Math.sqrt(move.x * move.x + move.z * move.z);
+      robotGroup.children.forEach(c => {
+        if (c.name === 'wheel') c.rotation.x += wheelSpeed * 0.15;
+      });
+
+      // Update stats
+      $('stat-x').textContent = robotPos.x.toFixed(2);
+      $('stat-z').textContent = robotPos.z.toFixed(2);
+      $('stat-r').textContent = Math.round(THREE.MathUtils.radToDeg(robotPos.ry) % 360) + '°';
+    }
+
+    // 3D mode: gentle camera bob
+    if (mode === '3d') {
+      camera.lookAt(robotGroup.position.x, 0.2, robotGroup.position.z);
+      camera.position.x += (robotGroup.position.x - camera.position.x) * 0.05;
+      camera.position.z += (robotGroup.position.z + 2.5 - camera.position.z) * 0.05;
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  // ── Resize ───────────────────────────────────
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  // ── JOYSTICK ─────────────────────────────────
+  const jBase = $('joystick-base');
+  const jThumb = $('joystick-thumb');
+  const JR = 38; // max radius
+  let jActive = false, jId = null, jOrigin = { x: 0, y: 0 };
+
+  function jStart(e) {
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    jActive = true;
+    jId = t.identifier ?? 0;
+    const r = jBase.getBoundingClientRect();
+    jOrigin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    jMove(e);
+  }
+
+  function jMove(e) {
+    if (!jActive) return;
+    const touches = e.changedTouches;
+    const t = touches ? Array.from(touches).find(t => t.identifier === jId) || touches[0] : e;
+    let dx = t.clientX - jOrigin.x;
+    let dy = t.clientY - jOrigin.y;
+    const dist = Math.min(Math.sqrt(dx * dx + dy * dy), JR);
+    const angle = Math.atan2(dy, dx);
+    dx = Math.cos(angle) * dist;
+    dy = Math.sin(angle) * dist;
+    jThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+    move.x = dx / JR;
+    move.z = dy / JR;
+  }
+
+  function jEnd() {
+    jActive = false;
+    jThumb.style.transform = 'translate(0,0)';
+    move.x = 0; move.z = 0;
+  }
+
+  jBase.addEventListener('touchstart', jStart, { passive: true });
+  jBase.addEventListener('touchmove', jMove, { passive: true });
+  jBase.addEventListener('touchend', jEnd);
+  jBase.addEventListener('mousedown', jStart);
+  window.addEventListener('mousemove', e => { if (jActive) jMove(e); });
+  window.addEventListener('mouseup', jEnd);
+
+  // ── Rotate buttons ────────────────────────────
+  function holdButton(btn, onDown, onUp) {
+    let iv = null;
+    btn.addEventListener('touchstart', e => { e.preventDefault(); onDown(); iv = setInterval(onDown, 16); btn.classList.add('active'); }, { passive: false });
+    btn.addEventListener('touchend', () => { clearInterval(iv); onUp(); btn.classList.remove('active'); });
+    btn.addEventListener('mousedown', () => { onDown(); iv = setInterval(onDown, 16); btn.classList.add('active'); });
+    window.addEventListener('mouseup', () => { clearInterval(iv); onUp(); btn.classList.remove('active'); });
+  }
+
+  holdButton($('btn-rotate-l'),
+    () => { move.rotY = 1; },
+    () => { move.rotY = 0; }
+  );
+  holdButton($('btn-rotate-r'),
+    () => { move.rotY = -1; },
+    () => { move.rotY = 0; }
+  );
+
+  // ── Reset ─────────────────────────────────────
+  $('btn-reset').addEventListener('click', () => {
+    robotPos.x = 0; robotPos.z = 0; robotPos.ry = 0;
+    if (mode === '3d') {
+      robotGroup.position.set(0, 0, 0);
+      robotGroup.rotation.y = 0;
+    }
+  });
+
+  // ── Start button ─────────────────────────────
+  $('btn-start').addEventListener('click', start);
+
+  // ── Keyboard (desktop dev) ────────────────────
+  const keys = {};
+  window.addEventListener('keydown', e => { keys[e.key] = true; updateKeys(); });
+  window.addEventListener('keyup', e => { keys[e.key] = false; updateKeys(); });
+
+  function updateKeys() {
+    move.z = (keys['ArrowUp'] || keys['w'] || keys['z']) ? -1 :
+             (keys['ArrowDown'] || keys['s']) ? 1 : 0;
+    move.x = (keys['ArrowLeft'] || keys['a'] || keys['q']) ? -0.7 :
+             (keys['ArrowRight'] || keys['d']) ? 0.7 : 0;
+    move.rotY = (keys['e']) ? 1 : (keys['r']) ? -1 : 0;
+  }
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
