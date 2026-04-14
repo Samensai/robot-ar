@@ -269,9 +269,16 @@
   const robotPos = { x:0, z:0, ry:0 };
   const SPEED = 0.04, ROT_SPEED = 0.04, ROT_SMOOTH = 0.18;
 
-  // Caméra fixe + gyro
+  // Caméra fixe + gyro (quaternion approach)
   const CAM_FIXED = { x:0, y:2.5, z:5 };
-  let camYaw = 0, camPitch = 0.25, baseAlpha = null;
+  let camYaw = 0, gyroActive = false;
+  // Helpers gyro — alloués une seule fois
+  const _devQuat  = new THREE.Quaternion();
+  const _qCorrect = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90° X : device→camera
+  const _qScreen  = new THREE.Quaternion();
+  const _zee      = new THREE.Vector3(0, 0, 1);
+  const _gyroEul  = new THREE.Euler();
+  let   _baseInv  = null;
 
   // ── Materials (partagés) ──────────────────────
   let MAT = {};
@@ -691,9 +698,7 @@
 
     camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.01, 100);
     camera.position.set(CAM_FIXED.x, CAM_FIXED.y, CAM_FIXED.z);
-    camera.rotation.order = 'YXZ';
-    camera.rotation.y = camYaw;
-    camera.rotation.x = -camPitch;
+    camera.lookAt(0, 0.2, 0); // orientation par défaut (avant que le gyro prenne la main)
 
     renderer = new THREE.WebGLRenderer({ canvas:$('main-canvas'), antialias:true, alpha:true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
@@ -813,17 +818,31 @@
   }
 
   function onGyro(e) {
-    if (e.alpha === null || e.beta === null) return;
-    const toRad = Math.PI / 180;
-    const alpha = e.alpha * toRad;
-    const beta  = e.beta  * toRad;
-    if (baseAlpha === null) baseAlpha = alpha;
-    // Yaw : rotation relative à l'orientation initiale du téléphone
-    let az = alpha - baseAlpha;
-    az = Math.atan2(Math.sin(az), Math.cos(az));
-    camYaw = -az; // négatif : tourner à droite = regarder à droite
-    // Pitch : inclinaison du téléphone (beta≈π/2 = tenu vertical = vue horizontale)
-    camPitch = THREE.MathUtils.clamp(Math.PI / 2 - beta, -0.2, 0.85);
+    if (e.alpha === null || e.beta === null || e.gamma === null) return;
+    gyroActive = true;
+
+    const a = THREE.MathUtils.degToRad(e.alpha);
+    const b = THREE.MathUtils.degToRad(e.beta);
+    const g = THREE.MathUtils.degToRad(e.gamma);
+
+    // Quaternion standard DeviceOrientation → espace monde Three.js
+    // Ordre 'YXZ' + correction -90° X (screen-up → screen-forward)
+    _gyroEul.set(b, a, -g, 'YXZ');
+    _devQuat.setFromEuler(_gyroEul);
+    _devQuat.multiply(_qCorrect);
+
+    // Correction orientation écran (portrait=0°, landscape=90°…)
+    const orient = THREE.MathUtils.degToRad(window.screen?.orientation?.angle || 0);
+    _qScreen.setFromAxisAngle(_zee, -orient);
+    _devQuat.multiply(_qScreen);
+
+    // Mémoriser l'orientation de départ → rotation relative
+    if (_baseInv === null) _baseInv = _devQuat.clone().invert();
+    camera.quaternion.multiplyQuaternions(_devQuat, _baseInv);
+
+    // Extraire le yaw horizontal pour le déplacement du robot
+    _gyroEul.setFromQuaternion(camera.quaternion, 'YXZ');
+    camYaw = _gyroEul.y;
   }
 
   // ═══════════════════════════════════════════════
@@ -915,11 +934,11 @@
       $('stat-r').textContent=Math.round(THREE.MathUtils.radToDeg(robotPos.ry)%360)+'°';
     }
 
-    // Caméra fixe — seule la rotation change (gyro)
+    // Caméra fixe — position constante, rotation gérée par onGyro()
     if(mode==='3d'){
       camera.position.set(CAM_FIXED.x, CAM_FIXED.y, CAM_FIXED.z);
-      camera.rotation.y = camYaw;
-      camera.rotation.x = -camPitch;
+      // Si pas de gyro actif : regarder le robot (lookAt statique)
+      if (!gyroActive) camera.lookAt(robotPos.x, 0.2, robotPos.z);
     }
 
     renderer.render(scene, camera);
