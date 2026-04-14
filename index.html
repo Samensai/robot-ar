@@ -400,9 +400,8 @@
             group.userData.pieceType = 'body';
             // Corps ellipsoïde via sphère aplatie
             const geo = new THREE.SphereGeometry(0.16, 24, 16);
-            // Aplatir en Y, étirer en Z
-            geo.applyMatrix4(new THREE.Matrix4().makeScale(1, 0.55, 1.2));
             const main = new THREE.Mesh(geo, MAT.body.clone());
+            main.scale.set(1, 0.55, 1.2);
             main.position.y = 0.1; main.castShadow = true;
             main.userData.pieceType = 'body'; group.add(main);
             // Dôme de cockpit
@@ -730,8 +729,9 @@
   function buildReticle() {
     reticleGroup = new THREE.Group();
     const geo = new THREE.RingGeometry(0.1,0.12,32);
-    geo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI/2));
-    reticleGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0x00f5ff,side:THREE.DoubleSide})));
+    const reticleMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0x00f5ff,side:THREE.DoubleSide}));
+    reticleMesh.rotation.x = -Math.PI/2;
+    reticleGroup.add(reticleMesh);
     reticleGroup.visible = false;
     scene.add(reticleGroup);
   }
