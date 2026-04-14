@@ -932,7 +932,22 @@
 
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.register('/robot-ar/sw.js').then(reg => {
+        // Quand une nouvelle version du SW est détectée
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              // Affiche un toast de mise à jour
+              const toast = document.createElement('div');
+              toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;background:#00f5ff;color:#0a0a0f;font-family:\'Share Tech Mono\',monospace;font-size:11px;letter-spacing:.12em;padding:10px 20px;border-radius:2px;cursor:pointer;box-shadow:0 0 16px rgba(0,245,255,0.5);white-space:nowrap;';
+              toast.textContent = '[ NOUVELLE VERSION — APPUYER POUR RECHARGER ]';
+              toast.addEventListener('click', () => location.reload());
+              document.body.appendChild(toast);
+            }
+          });
+        });
+      }).catch(() => {});
     }
   </script>
 </body>
