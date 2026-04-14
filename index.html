@@ -173,6 +173,10 @@
     <div><span class="stat-label">POS Z </span><span id="stat-z">0.00</span></div>
     <div><span class="stat-label">ROT   </span><span id="stat-r">0°</span></div>
     <div><span class="stat-label">MODE  </span><span id="stat-mode">—</span></div>
+    <div style="margin-top:5px;border-top:1px solid rgba(0,245,255,0.12);padding-top:5px;">
+      <span class="stat-label">ROOM  </span><span id="stat-room">—</span>
+    </div>
+    <div><span class="stat-label">ONLINE</span><span id="stat-players">—</span></div>
   </div>
 
   <div id="reticle-hint" class="hidden">
@@ -199,6 +203,7 @@
     <button class="ctrl-btn" id="btn-rotate-l">⟲ ROT L</button>
     <button class="ctrl-btn" id="btn-rotate-r">ROT R ⟳</button>
     <button class="ctrl-btn" id="btn-export-glb">⬇ GLB</button>
+    <button class="ctrl-btn" id="btn-invite" onclick="copyInvite()">⬆ INVITE</button>
   </div>
 
   <a id="ar-quicklook-btn" rel="ar" href="robot.usdz">
@@ -219,6 +224,8 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script>
 
   // ── DEBUG OVERLAY ─────────────────────────────
@@ -252,6 +259,40 @@
 
   dbgLog('Page chargée — ' + navigator.userAgent.substring(0,60));
   dbgLog('Three.js: ' + (typeof THREE !== 'undefined' ? THREE.REVISION : 'NON CHARGÉ'), typeof THREE !== 'undefined' ? '#88ff88' : '#ff4444');
+
+  // ── Firebase / Multijoueur ─────────────────────
+  firebase.initializeApp({
+    apiKey:            'AIzaSyDxL_tD0CqaWYdDghLVRgvqXnNihlNPLw0',
+    authDomain:        'robot-ar-b99e3.firebaseapp.com',
+    projectId:         'robot-ar-b99e3',
+    storageBucket:     'robot-ar-b99e3.firebasestorage.app',
+    messagingSenderId: '627300107612',
+    appId:             '1:627300107612:web:d4ed46eb962a147832ed99',
+    databaseURL:       'https://robot-ar-b99e3-default-rtdb.europe-west1.firebasedatabase.app'
+  });
+  const db = firebase.database();
+
+  // Room : récupérer depuis l'URL ou en générer un nouveau
+  const roomId = (() => {
+    const p = new URLSearchParams(location.search).get('room');
+    if (p) return p;
+    const code = Math.random().toString(36).substr(2,5).toUpperCase();
+    history.replaceState(null, '', '?room=' + code);
+    return code;
+  })();
+
+  // Identité du joueur local (persistée en session)
+  let myId = sessionStorage.getItem('robotar_pid');
+  if (!myId) { myId = Math.random().toString(36).substr(2,9); sessionStorage.setItem('robotar_pid', myId); }
+
+  const remoteRobots = {}; // { playerId: { group, targetX, targetZ, targetRy } }
+  let lastPublish = 0;
+
+  function copyInvite() {
+    const url = location.origin + location.pathname + '?room=' + roomId;
+    navigator.clipboard?.writeText(url).then(() => dbgLog('Lien copié !', '#88ff88'))
+      .catch(() => { prompt('Copie ce lien :', url); });
+  }
 
   // ═══════════════════════════════════════════════════════════
   //  ROBOT AR v0.2 — Système modulaire de pièces
@@ -740,6 +781,106 @@
   }
 
   // ═══════════════════════════════════════════════
+  //  ROBOT DISTANT
+  // ═══════════════════════════════════════════════
+
+  function buildRemoteRobot(data) {
+    // Sauvegarde config locale
+    const prev = { wheels: PIECES.wheels.current, body: PIECES.body.current, front: PIECES.front.current };
+    PIECES.wheels.current = data.wheels || 'small';
+    PIECES.body.current   = data.body   || 'square';
+    PIECES.front.current  = data.front  || 'shovel';
+
+    const group = new THREE.Group();
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.18,.025,.01), MAT.accent.clone());
+    eye.position.set(0,0.14,0.19); group.add(eye);
+    group.add(PIECES.body.options[PIECES.body.current].build());
+    group.add(PIECES.wheels.options[PIECES.wheels.current].build(WHEEL_POSITIONS));
+    group.add(PIECES.front.options[PIECES.front.current].build());
+
+    // Restaure config locale
+    PIECES.wheels.current = prev.wheels;
+    PIECES.body.current   = prev.body;
+    PIECES.front.current  = prev.front;
+
+    // Teinte orange pour distinguer l'adversaire
+    const mBody   = new THREE.MeshStandardMaterial({ color:0x3a1505, metalness:.7, roughness:.3 });
+    const mAccent = new THREE.MeshStandardMaterial({ color:0xff4422, metalness:.9, roughness:.1, emissive:0xcc2200, emissiveIntensity:.4 });
+    group.traverse(obj => {
+      if (!obj.isMesh) return;
+      const h = obj.material?.color?.getHex?.();
+      if (h === 0x111111) return; // roues gardent leur couleur sombre
+      obj.material = (h === 0x1a2a3a) ? mBody.clone() : mAccent.clone();
+    });
+
+    group.position.set(data.x || 0, 0, data.z || 0);
+    group.rotation.y = data.ry || 0;
+    return group;
+  }
+
+  // ── Firebase sync ─────────────────────────────
+
+  function publishPosition() {
+    const now = Date.now();
+    if (now - lastPublish < 66) return; // ~15 fps
+    lastPublish = now;
+    db.ref('rooms/' + roomId + '/players/' + myId).set({
+      x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
+      wheels: PIECES.wheels.current,
+      body:   PIECES.body.current,
+      front:  PIECES.front.current,
+      ts: now
+    });
+  }
+
+  function setupFirebase() {
+    // Afficher le code de room
+    $('stat-room').textContent = roomId;
+
+    const playersRef = db.ref('rooms/' + roomId + '/players');
+
+    playersRef.on('value', snap => {
+      const all = snap.val() || {};
+
+      // Supprimer les robots des joueurs partis
+      Object.keys(remoteRobots).forEach(id => {
+        if (!all[id]) { scene.remove(remoteRobots[id].group); delete remoteRobots[id]; }
+      });
+
+      // Ajouter / mettre à jour les robots distants
+      Object.entries(all).forEach(([id, p]) => {
+        if (id === myId) return;
+        if (!remoteRobots[id]) {
+          const group = buildRemoteRobot(p);
+          remoteRobots[id] = { group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
+                               wheels: p.wheels, body: p.body, front: p.front };
+          scene.add(group);
+        } else {
+          const r = remoteRobots[id];
+          r.targetX = p.x; r.targetZ = p.z; r.targetRy = p.ry;
+          // Reconstruire si les pièces ont changé
+          if (r.wheels !== p.wheels || r.body !== p.body || r.front !== p.front) {
+            const px = r.group.position.x, pz = r.group.position.z, pry = r.group.rotation.y;
+            scene.remove(r.group);
+            r.group = buildRemoteRobot(p);
+            r.group.position.set(px, 0, pz); r.group.rotation.y = pry;
+            r.wheels = p.wheels; r.body = p.body; r.front = p.front;
+            scene.add(r.group);
+          }
+        }
+      });
+
+      $('stat-players').textContent = Object.keys(all).length + '/2';
+    });
+
+    // Nettoyage à la déconnexion
+    db.ref('rooms/' + roomId + '/players/' + myId).onDisconnect().remove();
+    window.addEventListener('beforeunload', () => {
+      db.ref('rooms/' + roomId + '/players/' + myId).remove();
+    });
+  }
+
+  // ═══════════════════════════════════════════════
   //  THREE.JS INIT
   // ═══════════════════════════════════════════════
 
@@ -909,6 +1050,7 @@
     dbgLog('initThree...');
     initThree();
     dbgLog('initThree OK');
+    setupFirebase();
     dbgLog('startAR...');
     const arOk = await startAR();
     dbgLog('AR: ' + arOk);
@@ -998,6 +1140,15 @@
       // Si pas de gyro actif : regarder le robot (lookAt statique)
       if (!gyroActive) camera.lookAt(robotPos.x, 0.2, robotPos.z);
     }
+
+    // Publier position + interpoler robots distants
+    if (robotPlaced) publishPosition();
+    Object.values(remoteRobots).forEach(r => {
+      r.group.position.x += (r.targetX - r.group.position.x) * 0.25;
+      r.group.position.z += (r.targetZ - r.group.position.z) * 0.25;
+      const dRy = Math.atan2(Math.sin(r.targetRy - r.group.rotation.y), Math.cos(r.targetRy - r.group.rotation.y));
+      r.group.rotation.y += dRy * 0.25;
+    });
 
     renderer.render(scene, camera);
   }
