@@ -264,27 +264,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script>
 
-  // ── DEBUG OVERLAY ─────────────────────────────
-  // Debug désactivé en production
   function dbgLog(msg, color) {
-    console.log('%c' + msg, 'color:' + (color || '#88ff88'));
+    // no-op en production (debug overlay supprimé)
   }
-
-  window.addEventListener('error', e => {
-    dbgLog('ERROR: ' + e.message + ' (line ' + e.lineno + ')', '#ff4444');
-  });
-  window.addEventListener('unhandledrejection', e => {
-    dbgLog('PROMISE: ' + (e.reason?.message || e.reason), '#ff8844');
-  });
-
-  // Patch console
-  const _log = console.log, _warn = console.warn, _error = console.error;
-  console.log = (...a) => { _log(...a); dbgLog('LOG: ' + a.join(' '), '#88ff88'); };
-  console.warn = (...a) => { _warn(...a); dbgLog('WARN: ' + a.join(' '), '#ffcc44'); };
-  console.error = (...a) => { _error(...a); dbgLog('ERR: ' + a.join(' '), '#ff4444'); };
-
-  dbgLog('Page chargée — ' + navigator.userAgent.substring(0,60));
-  dbgLog('Three.js: ' + (typeof THREE !== 'undefined' ? THREE.REVISION : 'NON CHARGÉ'), typeof THREE !== 'undefined' ? '#88ff88' : '#ff4444');
 
   // ── Firebase / Multijoueur ─────────────────────
   firebase.initializeApp({
