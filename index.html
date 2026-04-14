@@ -706,7 +706,9 @@
     const dir = new THREE.DirectionalLight(0xffffff, 1.2);
     dir.position.set(3,6,4); dir.castShadow = true;
     dir.shadow.mapSize.set(1024,1024); scene.add(dir);
-    scene.add(Object.assign(new THREE.DirectionalLight(0x00f5ff,.4), {position: new THREE.Vector3(-4,2,-4)}));
+    const fillLight = new THREE.DirectionalLight(0x00f5ff, .4);
+    fillLight.position.set(-4, 2, -4);
+    scene.add(fillLight);
 
     // Sol + grille (mode 3D)
     const grid = new THREE.GridHelper(10,20,0x003344,0x001a22);
@@ -829,6 +831,7 @@
   async function start() {
     dbgLog('start() appelé');
     $('splash').classList.add('hidden');
+    try {
     dbgLog('initThree...');
     initThree();
     dbgLog('initThree OK');
@@ -847,6 +850,10 @@
     dbgLog('Loop démarrée ✓');
     renderer.setAnimationLoop(onFrame);
     checkUSDZ();
+    } catch(err) {
+      dbgLog('ERREUR init: ' + err.message, '#ff4444');
+      throw err;
+    }
   }
 
   // ═══════════════════════════════════════════════
