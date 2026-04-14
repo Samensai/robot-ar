@@ -297,9 +297,12 @@
 
   // Jump + collision
   let jumpY = 0, jumpVel = 0;
+  let pushVelX = 0, pushVelZ = 0;
   const JUMP_INIT_VEL = 0.06;
   const GRAVITY = 0.004;
-  const ROBOT_RADIUS = 0.32; // collision radius
+  const ROBOT_RADIUS = 0.32;
+  const PUSH_STRENGTH = 0.10; // vitesse initiale de poussée (unités/frame)
+  const PUSH_DECAY = 0.80;    // friction par frame
 
   function copyInvite() {
     const ov = document.createElement('div');
@@ -872,6 +875,7 @@
         if (!remoteRobots[id]) {
           const group = buildRemoteRobot(p);
           remoteRobots[id] = { group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
+                               lerpX: p.x, lerpZ: p.z, pushOffX: 0, pushOffZ: 0,
                                wheels: p.wheels, body: p.body, front: p.front,
                                jumpY: 0, jumpVel: 0 };
           scene.add(group);
@@ -1135,28 +1139,33 @@
         robotPos.ry += da * ROT_SMOOTH;
       }
 
+      // Appliquer vélocité de poussée (décroît chaque frame)
+      robotPos.x += pushVelX;
+      robotPos.z += pushVelZ;
+      pushVelX *= PUSH_DECAY;
+      pushVelZ *= PUSH_DECAY;
+
       // Collision murs de l'arène
       const limit = ARENA - 0.32;
       robotPos.x = THREE.MathUtils.clamp(robotPos.x, -limit, limit);
       robotPos.z = THREE.MathUtils.clamp(robotPos.z, -limit, limit);
 
-      // Collision robot-robot : poussée + saut
+      // Collision robot-robot : impulsion + saut
       const COLL_D = ROBOT_RADIUS * 2;
       Object.values(remoteRobots).forEach(r => {
-        const dx = robotPos.x - r.group.position.x;
-        const dz = robotPos.z - r.group.position.z;
+        const dx = robotPos.x - r.lerpX;
+        const dz = robotPos.z - r.lerpZ;
         const dist = Math.sqrt(dx * dx + dz * dz);
         if (dist < COLL_D && dist > 0.001) {
           const nx = dx / dist, nz = dz / dist;
-          const overlap = (COLL_D - dist) * 0.5;
-          // Pousser le robot local
-          robotPos.x = THREE.MathUtils.clamp(robotPos.x + nx * overlap, -limit, limit);
-          robotPos.z = THREE.MathUtils.clamp(robotPos.z + nz * overlap, -limit, limit);
+          // Impulsion sur le robot local (direction de séparation)
+          pushVelX = nx * PUSH_STRENGTH;
+          pushVelZ = nz * PUSH_STRENGTH;
           // Saut local (seulement si au sol)
           if (jumpY <= 0.001 && jumpVel <= 0) jumpVel = JUMP_INIT_VEL;
-          // Pousser visuellement le robot distant + déclencher son saut
-          r.group.position.x -= nx * overlap;
-          r.group.position.z -= nz * overlap;
+          // Pop visuel sur le robot distant + son saut
+          r.pushOffX = -nx * 0.30;
+          r.pushOffZ = -nz * 0.30;
           if (r.jumpY <= 0.001 && r.jumpVel <= 0) r.jumpVel = JUMP_INIT_VEL;
         }
       });
@@ -1193,17 +1202,19 @@
     // Publier position + interpoler robots distants
     if (robotPlaced) publishPosition();
     Object.values(remoteRobots).forEach(r => {
-      r.group.position.x += (r.targetX - r.group.position.x) * 0.25;
-      r.group.position.z += (r.targetZ - r.group.position.z) * 0.25;
+      r.lerpX += (r.targetX - r.lerpX) * 0.25;
+      r.lerpZ += (r.targetZ - r.lerpZ) * 0.25;
       const dRy = Math.atan2(Math.sin(r.targetRy - r.group.rotation.y), Math.cos(r.targetRy - r.group.rotation.y));
       r.group.rotation.y += dRy * 0.25;
+      r.pushOffX *= PUSH_DECAY;
+      r.pushOffZ *= PUSH_DECAY;
       // Physique de saut distant
       if (r.jumpVel > 0 || r.jumpY > 0) {
         r.jumpVel -= GRAVITY;
         r.jumpY = Math.max(0, r.jumpY + r.jumpVel);
         if (r.jumpY <= 0) { r.jumpY = 0; r.jumpVel = 0; }
       }
-      r.group.position.y = r.jumpY;
+      r.group.position.set(r.lerpX + r.pushOffX, r.jumpY, r.lerpZ + r.pushOffZ);
     });
 
     renderer.render(scene, camera);
@@ -1358,20 +1369,7 @@
 
   // Service Worker
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/robot-ar/sw.js').then(reg=>{
-      reg.addEventListener('updatefound',()=>{
-        const w=reg.installing;
-        w.addEventListener('statechange',()=>{
-          if(w.state==='activated'){
-            const t=document.createElement('div');
-            t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;background:#00f5ff;color:#0a0a0f;font-family:\'Share Tech Mono\',monospace;font-size:11px;letter-spacing:.12em;padding:10px 20px;border-radius:2px;cursor:pointer;box-shadow:0 0 16px rgba(0,245,255,0.5);white-space:nowrap;';
-            t.textContent='[ NOUVELLE VERSION — APPUYER POUR RECHARGER ]';
-            t.addEventListener('click',()=>location.reload());
-            document.body.appendChild(t);
-          }
-        });
-      });
-    }).catch(()=>{});
+    navigator.serviceWorker.register('/robot-ar/sw.js').catch(()=>{});
   }
   </script>
 </body>
