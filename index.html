@@ -381,7 +381,7 @@
             // Antenne fine
             const ant = new THREE.Mesh(new THREE.CylinderGeometry(.004,.004,.1,6), MAT.accent.clone());
             ant.position.set(0.05,0.24,-0.05); ant.userData.pieceType = 'body'; group.add(ant);
-            const antTop = new THREE.Mesh(new THREE.SphereGeometry(.012,8,8), MAT.cyan);
+            const antTop = new THREE.Mesh(new THREE.SphereGeometry(.012,8,8), MAT.accent.clone());
             antTop.position.set(0.05,0.295,-0.05); antTop.userData.pieceType = 'body'; group.add(antTop);
             return group;
           }
@@ -869,7 +869,7 @@
 
   function setStatus(label, state) {
     $('status-text').textContent=label;
-    $('status-dot').className='';
+    $('status-dot').className='status-dot';
     if(state) $('status-dot').classList.add(state);
     if(state==='ar') $('stat-mode').textContent='AR';
     if(state==='active') $('stat-mode').textContent='3D';
