@@ -1,5 +1,5 @@
 const CACHE = 'robot-ar-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const ASSETS = ['/robot-ar/', '/robot-ar/index.html', '/robot-ar/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
