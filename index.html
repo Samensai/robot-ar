@@ -90,12 +90,13 @@
       border-radius:2px; cursor:pointer; box-shadow:0 0 16px rgba(0,245,255,0.4);
       transition:opacity .3s,visibility .3s; }
     #btn-place.hidden { opacity:0; visibility:hidden; }
-    /* AR Quick Look */
-    #ar-quicklook-btn { display:none; position:fixed; bottom:24px; left:50%;
-      transform:translateX(-50%); z-index:30; font-family:var(--font-mono);
-      font-size:12px; letter-spacing:.12em; color:var(--dark); background:var(--orange);
-      border:none; padding:12px 24px; border-radius:2px; cursor:pointer;
-      text-decoration:none; box-shadow:0 0 16px rgba(255,107,43,0.4); white-space:nowrap; }
+    /* AR Quick Look — dans le menu splash */
+    #ar-quicklook-btn { display:none; width:100%; margin-top:10px;
+      font-family:var(--font-mono); font-size:13px; letter-spacing:.1em;
+      color:var(--orange); background:none;
+      border:1.5px solid rgba(255,107,43,0.3);
+      padding:12px 0; border-radius:2px; cursor:pointer;
+      text-align:center; text-decoration:none; }
 
     /* ═══════════════════════════════════════════
        PIECE SELECTION MENU
@@ -184,7 +185,7 @@
     </div>
   </div>
 
-  <div id="stats-hud">
+  <div id="stats-hud" style="display:none">
     <div><span class="stat-label">POS X </span><span id="stat-x">0.00</span></div>
     <div><span class="stat-label">POS Z </span><span id="stat-z">0.00</span></div>
     <div><span class="stat-label">ROT   </span><span id="stat-r">0°</span></div>
@@ -218,13 +219,8 @@
     <button class="ctrl-btn" id="btn-reset">↺ RESET</button>
     <button class="ctrl-btn" id="btn-rotate-l">⟲ ROT L</button>
     <button class="ctrl-btn" id="btn-rotate-r">ROT R ⟳</button>
-    <button class="ctrl-btn" id="btn-export-glb">⬇ GLB</button>
     <button class="ctrl-btn" id="btn-invite" onclick="copyInvite()">⬆ INVITE</button>
   </div>
-
-  <a id="ar-quicklook-btn" rel="ar" href="robot.usdz">
-    <img src="" style="display:none" alt=""/>📱 VOIR EN AR
-  </a>
 
   <div id="splash">
     <div class="splash-title">ROBOT::AR</div>
@@ -240,6 +236,8 @@
       </div>
       <button class="btn-splash-primary" id="btn-create">[ CRÉER UNE PARTIE ]</button>
       <button class="btn-splash-sec" id="btn-show-join">Rejoindre une partie →</button>
+      <button class="btn-splash-sec" id="btn-export-glb-menu" style="font-size:12px;margin-top:10px;">⬇ Exporter le robot GLB</button>
+      <a id="ar-quicklook-btn" rel="ar" href="robot.usdz">📱 Voir en AR</a>
     </div>
 
     <!-- Vue 2 : créer → afficher le code -->
@@ -267,19 +265,9 @@
   <script>
 
   // ── DEBUG OVERLAY ─────────────────────────────
-  const dbg = document.createElement('div');
-  dbg.style.cssText = 'position:fixed;top:50px;left:8px;right:8px;z-index:999;background:rgba(0,0,0,0.9);border:1px solid #ff4444;border-radius:4px;padding:10px;font-family:monospace;font-size:10px;color:#ff8888;max-height:50vh;overflow-y:auto;pointer-events:none;';
-  dbg.id = 'debug-overlay';
-  document.body.appendChild(dbg);
-
+  // Debug désactivé en production
   function dbgLog(msg, color) {
-    const line = document.createElement('div');
-    line.style.color = color || '#88ff88';
-    line.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
-    line.style.padding = '2px 0';
-    line.textContent = msg;
-    dbg.appendChild(line);
-    dbg.scrollTop = dbg.scrollHeight;
+    console.log('%c' + msg, 'color:' + (color || '#88ff88'));
   }
 
   window.addEventListener('error', e => {
@@ -322,8 +310,14 @@
   let myId = sessionStorage.getItem('robotar_pid');
   if (!myId) { myId = Math.random().toString(36).substr(2,9); sessionStorage.setItem('robotar_pid', myId); }
 
-  const remoteRobots = {}; // { playerId: { group, targetX, targetZ, targetRy } }
+  const remoteRobots = {}; // { playerId: { group, targetX, targetZ, targetRy, jumpY, jumpVel } }
   let lastPublish = 0;
+
+  // Jump + collision
+  let jumpY = 0, jumpVel = 0;
+  const JUMP_INIT_VEL = 0.06;
+  const GRAVITY = 0.004;
+  const ROBOT_RADIUS = 0.32; // collision radius
 
   function copyInvite() {
     const ov = document.createElement('div');
@@ -896,7 +890,8 @@
         if (!remoteRobots[id]) {
           const group = buildRemoteRobot(p);
           remoteRobots[id] = { group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
-                               wheels: p.wheels, body: p.body, front: p.front };
+                               wheels: p.wheels, body: p.body, front: p.front,
+                               jumpY: 0, jumpVel: 0 };
           scene.add(group);
         } else {
           const r = remoteRobots[id];
@@ -1163,7 +1158,36 @@
       robotPos.x = THREE.MathUtils.clamp(robotPos.x, -limit, limit);
       robotPos.z = THREE.MathUtils.clamp(robotPos.z, -limit, limit);
 
+      // Collision robot-robot : poussée + saut
+      const COLL_D = ROBOT_RADIUS * 2;
+      Object.values(remoteRobots).forEach(r => {
+        const dx = robotPos.x - r.group.position.x;
+        const dz = robotPos.z - r.group.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < COLL_D && dist > 0.001) {
+          const nx = dx / dist, nz = dz / dist;
+          const overlap = (COLL_D - dist) * 0.5;
+          // Pousser le robot local
+          robotPos.x = THREE.MathUtils.clamp(robotPos.x + nx * overlap, -limit, limit);
+          robotPos.z = THREE.MathUtils.clamp(robotPos.z + nz * overlap, -limit, limit);
+          // Saut local (seulement si au sol)
+          if (jumpY <= 0.001 && jumpVel <= 0) jumpVel = JUMP_INIT_VEL;
+          // Pousser visuellement le robot distant + déclencher son saut
+          r.group.position.x -= nx * overlap;
+          r.group.position.z -= nz * overlap;
+          if (r.jumpY <= 0.001 && r.jumpVel <= 0) r.jumpVel = JUMP_INIT_VEL;
+        }
+      });
+
+      // Physique de saut local
+      if (jumpVel > 0 || jumpY > 0) {
+        jumpVel -= GRAVITY;
+        jumpY = Math.max(0, jumpY + jumpVel);
+        if (jumpY <= 0) { jumpY = 0; jumpVel = 0; }
+      }
+
       robotGroup.position.x = robotPos.x;
+      robotGroup.position.y = jumpY;
       robotGroup.position.z = robotPos.z;
       robotGroup.rotation.y = robotPos.ry;
 
@@ -1191,6 +1215,13 @@
       r.group.position.z += (r.targetZ - r.group.position.z) * 0.25;
       const dRy = Math.atan2(Math.sin(r.targetRy - r.group.rotation.y), Math.cos(r.targetRy - r.group.rotation.y));
       r.group.rotation.y += dRy * 0.25;
+      // Physique de saut distant
+      if (r.jumpVel > 0 || r.jumpY > 0) {
+        r.jumpVel -= GRAVITY;
+        r.jumpY = Math.max(0, r.jumpY + r.jumpVel);
+        if (r.jumpY <= 0) { r.jumpY = 0; r.jumpVel = 0; }
+      }
+      r.group.position.y = r.jumpY;
     });
 
     renderer.render(scene, camera);
@@ -1220,21 +1251,31 @@
       .catch(()=>{});
   }
 
-  // ── GLB Export ────────────────────────────────
-  $('btn-export-glb').addEventListener('click',()=>{
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js';
-    s.onload=()=>{
-      new THREE.GLTFExporter().parse(robotGroup,result=>{
-        const a=Object.assign(document.createElement('a'),{
-          href:URL.createObjectURL(new Blob([result],{type:'application/octet-stream'})),
-          download:'robot.glb'
+  // ── GLB Export (depuis menu principal) ────────
+  function exportGLBFromMenu() {
+    initMaterials(); // peuple MAT si pas encore initialisé
+    function doExport() {
+      const tmpGroup = new THREE.Group();
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.18,.025,.01), MAT.accent.clone());
+      eye.position.set(0,0.14,0.19); tmpGroup.add(eye);
+      tmpGroup.add(PIECES.body.options[PIECES.body.current].build());
+      tmpGroup.add(PIECES.wheels.options[PIECES.wheels.current].build(WHEEL_POSITIONS));
+      tmpGroup.add(PIECES.front.options[PIECES.front.current].build());
+      new THREE.GLTFExporter().parse(tmpGroup, result => {
+        const a = Object.assign(document.createElement('a'), {
+          href: URL.createObjectURL(new Blob([result],{type:'application/octet-stream'})),
+          download: 'robot.glb'
         });
         a.click();
-      },{binary:true});
-    };
+      }, {binary:true});
+    }
+    if (THREE.GLTFExporter) { doExport(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js';
+    s.onload = doExport;
     document.head.appendChild(s);
-  });
+  }
+  $('btn-export-glb-menu').addEventListener('click', exportGLBFromMenu);
 
   // ── Joystick ──────────────────────────────────
   const jBase=$('joystick-base'), jThumb=$('joystick-thumb');
