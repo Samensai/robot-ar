@@ -2,7 +2,7 @@
   "name": "ROBOT AR — Prototype",
   "short_name": "ROBOT AR",
   "description": "Prototype de jeu de combat de robots en réalité augmentée",
-  "start_url": "/",
+  "start_url": "/robot-ar/",
   "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#0a0a0f",
