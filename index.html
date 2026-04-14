@@ -267,11 +267,11 @@
   let xrSession = null, xrHitTestSource = null, reticleGroup = null;
   const move = { x:0, z:0, rotY:0 };
   const robotPos = { x:0, z:0, ry:0 };
-  const SPEED = 0.04, ROT_SPEED = 0.04;
+  const SPEED = 0.04, ROT_SPEED = 0.04, ROT_SMOOTH = 0.18;
 
-  // Gyro orbital
-  const ORBIT_RADIUS = 1.8, ORBIT_SMOOTH = 0.1;
-  let orbitAzimuth = 0, orbitElevation = 0.4, baseAlpha = null;
+  // Caméra fixe + gyro
+  const CAM_FIXED = { x:0, y:2.5, z:5 };
+  let camYaw = 0, camPitch = 0.25, baseAlpha = null;
 
   // ── Materials (partagés) ──────────────────────
   let MAT = {};
@@ -689,9 +689,11 @@
     scene = new THREE.Scene();
     initMaterials();
 
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-    camera.position.set(0,1.6,2);
-    camera.lookAt(0,0.2,0);
+    camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.01, 100);
+    camera.position.set(CAM_FIXED.x, CAM_FIXED.y, CAM_FIXED.z);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = camYaw;
+    camera.rotation.x = -camPitch;
 
     renderer = new THREE.WebGLRenderer({ canvas:$('main-canvas'), antialias:true, alpha:true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
@@ -811,17 +813,17 @@
   }
 
   function onGyro(e) {
-    if(e.alpha===null||e.beta===null) return;
-    const toRad=Math.PI/180;
-    const alpha=e.alpha*toRad, beta=e.beta*toRad;
-    if(baseAlpha===null) baseAlpha=alpha;
-    let az=alpha-baseAlpha;
-    az=Math.atan2(Math.sin(az),Math.cos(az));
-    let el=Math.PI/2-beta;
-    el=THREE.MathUtils.clamp(el,-0.15,Math.PI*0.55);
-    const da=az-orbitAzimuth;
-    orbitAzimuth+=Math.atan2(Math.sin(da),Math.cos(da))*ORBIT_SMOOTH;
-    orbitElevation+=(el-orbitElevation)*ORBIT_SMOOTH;
+    if (e.alpha === null || e.beta === null) return;
+    const toRad = Math.PI / 180;
+    const alpha = e.alpha * toRad;
+    const beta  = e.beta  * toRad;
+    if (baseAlpha === null) baseAlpha = alpha;
+    // Yaw : rotation relative à l'orientation initiale du téléphone
+    let az = alpha - baseAlpha;
+    az = Math.atan2(Math.sin(az), Math.cos(az));
+    camYaw = -az; // négatif : tourner à droite = regarder à droite
+    // Pitch : inclinaison du téléphone (beta≈π/2 = tenu vertical = vue horizontale)
+    camPitch = THREE.MathUtils.clamp(Math.PI / 2 - beta, -0.2, 0.85);
   }
 
   // ═══════════════════════════════════════════════
@@ -874,20 +876,38 @@
       } else reticleGroup.visible=false;
     }
 
-    // Déplacement robot
+    // Déplacement + orientation robot
     if(robotPlaced){
-      const fwd=new THREE.Vector3(Math.sin(robotPos.ry),0,Math.cos(robotPos.ry));
-      const right=new THREE.Vector3(Math.cos(robotPos.ry),0,-Math.sin(robotPos.ry));
-      robotPos.x+=(fwd.x*(-move.z)+right.x*move.x)*SPEED;
-      robotPos.z+=(fwd.z*(-move.z)+right.z*move.x)*SPEED;
-      robotPos.ry+=move.rotY*ROT_SPEED;
-      robotGroup.position.x=robotPos.x;
-      robotGroup.position.z=robotPos.z;
-      robotGroup.rotation.y=robotPos.ry;
+      const jLen = Math.sqrt(move.x*move.x + move.z*move.z);
+
+      if (move.rotY !== 0) {
+        // Boutons ROT : rotation manuelle sans déplacement
+        robotPos.ry += move.rotY * ROT_SPEED;
+      } else if (jLen > 0.05) {
+        // Joystick : direction relative à la caméra (yaw uniquement)
+        // cameraRight  = ( cos(camYaw), 0, -sin(camYaw) )
+        // cameraForward = (-sin(camYaw), 0, -cos(camYaw) )
+        // worldMove = cameraRight*move.x + cameraForward*(-move.z)
+        const wx = Math.cos(camYaw)*move.x + Math.sin(camYaw)*move.z;
+        const wz = -Math.sin(camYaw)*move.x + Math.cos(camYaw)*move.z;
+
+        // Déplacer
+        robotPos.x += wx * SPEED;
+        robotPos.z += wz * SPEED;
+
+        // Orienter le robot vers la direction de déplacement (smooth)
+        const targetRy = Math.atan2(wx, wz);
+        const da = Math.atan2(Math.sin(targetRy - robotPos.ry), Math.cos(targetRy - robotPos.ry));
+        robotPos.ry += da * ROT_SMOOTH;
+      }
+
+      robotGroup.position.x = robotPos.x;
+      robotGroup.position.z = robotPos.z;
+      robotGroup.rotation.y = robotPos.ry;
 
       // Animer les roues
-      const spd=Math.sqrt(move.x*move.x+move.z*move.z);
-      const wGroup=robotGroup.getObjectByName('wheels');
+      const spd = Math.sqrt(move.x*move.x + move.z*move.z);
+      const wGroup = robotGroup.getObjectByName('wheels');
       if(wGroup) wGroup.traverse(c=>{ if(c.isMesh&&c.geometry?.type==='CylinderGeometry') c.rotation.x+=spd*.15; });
 
       $('stat-x').textContent=robotPos.x.toFixed(2);
@@ -895,15 +915,11 @@
       $('stat-r').textContent=Math.round(THREE.MathUtils.radToDeg(robotPos.ry)%360)+'°';
     }
 
-    // Caméra orbitale (mode 3D)
+    // Caméra fixe — seule la rotation change (gyro)
     if(mode==='3d'){
-      const target=new THREE.Vector3(robotPos.x,0.15,robotPos.z);
-      camera.position.set(
-        target.x+ORBIT_RADIUS*Math.cos(orbitElevation)*Math.sin(orbitAzimuth),
-        target.y+ORBIT_RADIUS*Math.sin(orbitElevation),
-        target.z+ORBIT_RADIUS*Math.cos(orbitElevation)*Math.cos(orbitAzimuth)
-      );
-      camera.lookAt(target);
+      camera.position.set(CAM_FIXED.x, CAM_FIXED.y, CAM_FIXED.z);
+      camera.rotation.y = camYaw;
+      camera.rotation.x = -camPitch;
     }
 
     renderer.render(scene, camera);
