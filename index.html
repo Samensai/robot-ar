@@ -728,15 +728,30 @@
     }
   }
 
-  // ── Gyro handler ─────────────────────────────
-  let gyroBaseBeta = null;
+  // ── Gyro orbital camera ─────────────────────────────────────────
+  // La camera orbite a distance fixe autour du robot, pointee vers lui.
+  // alpha (boussole 0-360) = azimut horizontal
+  // beta (inclinaison avant/arriere) = elevation verticale
+  const ORBIT_RADIUS = 1.8;
+  const ORBIT_SMOOTH = 0.1;
+  let orbitAzimuth = 0;
+  let orbitElevation = 0.4;
+  let baseAlpha = null;
+
   function onGyro(e) {
-    if (e.beta === null || e.gamma === null) return;
-    if (gyroBaseBeta === null) gyroBaseBeta = e.beta;
-    const tiltFwd = THREE.MathUtils.clamp(e.beta - 70, -40, 40);
-    const tiltSide = THREE.MathUtils.clamp(e.gamma, -30, 30);
-    camera.position.y = 1.6 - tiltFwd * 0.018;
-    camera.position.x += (tiltSide * 0.012 - camera.position.x) * 0.08;
+    if (e.alpha === null || e.beta === null || e.gamma === null) return;
+    const toRad = Math.PI / 180;
+    const alpha = e.alpha * toRad;
+    const beta  = e.beta  * toRad;
+    if (baseAlpha === null) baseAlpha = alpha;
+    let az = alpha - baseAlpha;
+    az = Math.atan2(Math.sin(az), Math.cos(az));
+    let el = Math.PI / 2 - beta;
+    el = THREE.MathUtils.clamp(el, -0.15, Math.PI * 0.55);
+    const da = az - orbitAzimuth;
+    const daNorm = Math.atan2(Math.sin(da), Math.cos(da));
+    orbitAzimuth   += daNorm * ORBIT_SMOOTH;
+    orbitElevation += (el - orbitElevation) * ORBIT_SMOOTH;
   }
 
   // ── AR place ─────────────────────────────────
@@ -807,11 +822,15 @@
       $('stat-r').textContent = Math.round(THREE.MathUtils.radToDeg(robotPos.ry) % 360) + '°';
     }
 
-    // 3D mode: gentle camera bob
+    // 3D mode: camera orbits around the robot using gyro
     if (mode === '3d') {
-      camera.lookAt(robotGroup.position.x, 0.2, robotGroup.position.z);
-      camera.position.x += (robotGroup.position.x - camera.position.x) * 0.05;
-      camera.position.z += (robotGroup.position.z + 2.5 - camera.position.z) * 0.05;
+      const target = new THREE.Vector3(robotPos.x, 0.15, robotPos.z);
+      // Spherical to cartesian
+      const cx = target.x + ORBIT_RADIUS * Math.cos(orbitElevation) * Math.sin(orbitAzimuth);
+      const cy = target.y + ORBIT_RADIUS * Math.sin(orbitElevation);
+      const cz = target.z + ORBIT_RADIUS * Math.cos(orbitElevation) * Math.cos(orbitAzimuth);
+      camera.position.set(cx, cy, cz);
+      camera.lookAt(target);
     }
 
     renderer.render(scene, camera);
