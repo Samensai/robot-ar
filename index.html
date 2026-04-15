@@ -212,8 +212,15 @@
     .cust-swatch.sel { border-color:#fff; transform:scale(1.2); }
 
     /* ── Jeu en cours ── */
-    #game-controls { position:fixed; top:60px; right:16px; z-index:30;
+    #game-controls { position:fixed; top:92px; right:16px; z-index:30;
       display:none; flex-direction:column; gap:8px; align-items:flex-end; }
+    #btn-landscape { position:fixed; top:52px; left:16px; z-index:30; display:none;
+      font-family:var(--font-mono); font-size:10px; letter-spacing:.1em;
+      color:var(--cyan); background:rgba(0,0,0,0.5); border:1.5px solid rgba(0,245,255,0.2);
+      border-radius:4px; padding:8px 10px; cursor:pointer; backdrop-filter:blur(8px);
+      transition:background .15s,border-color .15s; -webkit-user-select:none; user-select:none; }
+    #btn-landscape:active { background:rgba(0,245,255,0.15); border-color:rgba(0,245,255,0.6); }
+    #btn-landscape.active { background:rgba(0,245,255,0.12); border-color:rgba(0,245,255,0.55); }
     #btn-attack { position:fixed; bottom:24px; left:24px; z-index:30; width:100px; height:100px;
       border-radius:50%; background:rgba(200,30,30,0.12); border:2px solid rgba(255,60,60,0.3);
       font-size:30px; color:rgba(255,80,60,0.85); cursor:pointer; display:none;
@@ -222,11 +229,12 @@
     #btn-attack.ready { border-color:rgba(255,60,60,0.75); box-shadow:0 0 18px rgba(255,50,40,0.45); }
     #btn-attack.cooling { opacity:0.35; }
     #btn-attack:active { background:rgba(200,30,30,0.35); }
-    #hp-enemy-wrap { position:fixed; top:52px; left:16px; right:16px; z-index:25;
+    #hp-enemy-wrap { position:fixed; top:52px; left:90px; right:16px; z-index:25;
       display:none; flex-direction:column; gap:3px; }
     #hp-me-wrap { position:fixed; bottom:16px; left:160px; right:160px; z-index:25;
       display:none; flex-direction:column; gap:3px; }
-    .hp-bg { height:7px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; }
+    .hp-bg { height:7px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;
+      position:relative; }
     .hp-fill { height:100%; border-radius:3px; width:100%; transition:width 0.25s ease-out; }
     #hp-fill-me { background:linear-gradient(90deg,#00cc55,#00ff88);
       box-shadow:0 0 6px rgba(0,255,136,0.5); }
@@ -235,6 +243,24 @@
     .hp-label { font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; }
     #hp-label-me { color:rgba(0,255,136,0.55); text-align:center; }
     #hp-label-enemy { color:rgba(255,68,34,0.55); text-align:center; }
+
+    /* ── Mode paysage ── */
+    body.ls #hp-enemy-wrap {
+      top:50%; left:auto; right:130px; transform:translateY(-50%);
+      flex-direction:column; align-items:center; width:auto; gap:4px; }
+    body.ls #hp-me-wrap {
+      bottom:auto; top:50%; left:130px; right:auto; transform:translateY(-50%);
+      flex-direction:column; align-items:center; width:auto; gap:4px; }
+    body.ls .hp-bg {
+      height:clamp(100px,30vh,160px); width:8px; border-radius:3px; }
+    body.ls .hp-fill {
+      position:absolute; bottom:0; left:0; width:100% !important;
+      border-radius:3px; transition:height .25s ease-out; }
+    body.ls .hp-label { writing-mode:vertical-rl; font-size:8px; letter-spacing:.1em; }
+    body.ls #game-controls {
+      top:8px; right:auto; left:50%; transform:translateX(-50%);
+      flex-direction:row; gap:10px; }
+    body.ls #btn-landscape { top:8px; }
   </style>
 </head>
 <body>
@@ -283,6 +309,7 @@
     <div id="joystick-base"><div id="joystick-thumb"></div></div>
   </div>
 
+  <button id="btn-landscape">↺ PAYSAGE</button>
   <button id="btn-attack">⚔</button>
 
   <!-- HP bars -->
@@ -419,6 +446,7 @@
   let gameOver = false;
   let isCreator = false;
   let camSide = 1;
+  let landscapeMode = false;
   let attackCooldown = 0;      // timestamp (ms) when cooldown expires
   let attackAnim = null;        // { group, origZ, phase, t0 }
   let lastAttackPublished = null; // { t, dmg } pending publish
@@ -1161,14 +1189,24 @@
   }
 
   function updateHPBars() {
-    const myPct = myMaxHP > 0 ? (myHP / myMaxHP * 100) : 0;
-    $('hp-fill-me').style.width = myPct + '%';
-    $('hp-label-me').textContent = myHP + ' / ' + myMaxHP;
+    const myPct  = myMaxHP > 0 ? (myHP / myMaxHP * 100) : 0;
+    const fillMe = $('hp-fill-me');
+    if (landscapeMode) {
+      fillMe.style.width = '100%'; fillMe.style.height = myPct + '%';
+    } else {
+      fillMe.style.width = myPct + '%'; fillMe.style.height = '100%';
+    }
+    $('hp-label-me').textContent = myHP + '/' + myMaxHP;
     const enemy = Object.values(remoteRobots)[0];
     if (enemy && enemy.maxHP > 0) {
-      const ePct = (enemy.hp / enemy.maxHP * 100);
-      $('hp-fill-enemy').style.width = ePct + '%';
-      $('hp-label-enemy').textContent = enemy.hp + ' / ' + enemy.maxHP;
+      const ePct  = enemy.hp / enemy.maxHP * 100;
+      const fillEn = $('hp-fill-enemy');
+      if (landscapeMode) {
+        fillEn.style.width = '100%'; fillEn.style.height = ePct + '%';
+      } else {
+        fillEn.style.width = ePct + '%'; fillEn.style.height = '100%';
+      }
+      $('hp-label-enemy').textContent = enemy.hp + '/' + enemy.maxHP;
     }
   }
 
@@ -1393,6 +1431,7 @@
     $('game-controls').style.display = 'flex';
     $('btn-attack').style.display = 'flex';
     $('btn-attack').classList.add('ready');
+    $('btn-landscape').style.display = 'block';
     $('hp-enemy-wrap').style.display = 'flex';
     $('hp-me-wrap').style.display = 'flex';
     updateHPBars();
@@ -1439,21 +1478,27 @@
     if(robotPlaced){
       const jLen = Math.sqrt(move.x*move.x + move.z*move.z);
 
-      if (move.rotY !== 0) {
+      const effSpeed = SPEED
+        * PIECES.wheels.options[PIECES.wheels.current].speed
+        * PIECES.body.options[PIECES.body.current].speed;
+
+      if (landscapeMode && jLen > 0.05) {
+        // Mode paysage — contrôles tank :
+        // vers le haut du téléphone (= gauche écran = move.x négatif) → tourne à gauche (+ry)
+        robotPos.ry += (-move.x) * ROT_SPEED * 2.0;
+        // avant/arrière : vers le haut de l'écran (move.z négatif) = avancer
+        if (Math.abs(move.z) > 0.05) {
+          robotPos.x += Math.sin(robotPos.ry) * (-move.z) * effSpeed;
+          robotPos.z += Math.cos(robotPos.ry) * (-move.z) * effSpeed;
+        }
+      } else if (move.rotY !== 0) {
         // Boutons ROT : rotation manuelle sans déplacement
         robotPos.ry += move.rotY * ROT_SPEED;
       } else if (jLen > 0.05) {
         // Joystick : direction relative à la caméra (yaw uniquement)
-        // cameraRight  = ( cos(camYaw), 0, -sin(camYaw) )
-        // cameraForward = (-sin(camYaw), 0, -cos(camYaw) )
-        // worldMove = cameraRight*move.x + cameraForward*(-move.z)
         const wx = Math.cos(camYaw)*move.x + Math.sin(camYaw)*move.z;
         const wz = -Math.sin(camYaw)*move.x + Math.cos(camYaw)*move.z;
 
-        // Déplacer (vitesse réelle = base × roues × corps)
-        const effSpeed = SPEED
-          * PIECES.wheels.options[PIECES.wheels.current].speed
-          * PIECES.body.options[PIECES.body.current].speed;
         robotPos.x += wx * effSpeed;
         robotPos.z += wz * effSpeed;
 
@@ -2085,6 +2130,23 @@
     custRunning = false;
   });
 
+  function toggleLandscape() {
+    landscapeMode = !landscapeMode;
+    document.body.classList.toggle('ls', landscapeMode);
+    const btn = $('btn-landscape');
+    btn.classList.toggle('active', landscapeMode);
+    btn.textContent = landscapeMode ? '↺ PORTRAIT' : '↺ PAYSAGE';
+    // Réinitialiser la transition des barres de vie selon l'orientation
+    [$('hp-fill-me'), $('hp-fill-enemy')].forEach(el => {
+      if (el) el.style.transition = landscapeMode
+        ? 'height .25s ease-out'
+        : 'width .25s ease-out';
+    });
+    updateHPBars();
+  }
+
+  $('btn-landscape').addEventListener('click', toggleLandscape);
+  $('btn-landscape').addEventListener('touchstart', e => { e.preventDefault(); toggleLandscape(); }, { passive: false });
   $('btn-attack').addEventListener('click', doAttack);
   $('btn-attack').addEventListener('touchstart', e => { e.preventDefault(); doAttack(); }, { passive: false });
   $('btn-invite-game').addEventListener('click', copyInvite);
