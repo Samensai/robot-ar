@@ -198,7 +198,7 @@
     #cust-stats { width:100%; display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
     .cust-stat-row { display:flex; align-items:center; gap:8px; }
     .cust-stat-label { font-family:var(--font-mono); font-size:9px;
-      color:rgba(0,245,255,0.4); letter-spacing:.15em; width:56px; flex-shrink:0; }
+      color:rgba(0,245,255,0.4); letter-spacing:.12em; width:62px; flex-shrink:0; }
     .cust-pips { display:flex; gap:3px; }
     .cust-pip { width:16px; height:5px; border-radius:2px;
       background:rgba(0,245,255,0.1); border:1px solid rgba(0,245,255,0.14); }
@@ -334,6 +334,14 @@
         <div class="cust-stat-row">
           <span class="cust-stat-label">VIE</span>
           <div class="cust-pips" id="stat-hp"></div>
+        </div>
+        <div class="cust-stat-row">
+          <span class="cust-stat-label">DÉGÂTS</span>
+          <div class="cust-pips" id="stat-dmg"></div>
+        </div>
+        <div class="cust-stat-row">
+          <span class="cust-stat-label">CADENCE</span>
+          <div class="cust-pips" id="stat-rate"></div>
         </div>
       </div>
       <!-- Couleur -->
@@ -782,6 +790,7 @@
 
   function onTap(clientX, clientY) {
     if (!robotPlaced) return;
+    if (roomId) return; // pièces verrouillées pendant une partie
 
     // Calculer la position normalisée
     tapPoint.x = (clientX / window.innerWidth)  * 2 - 1;
@@ -889,47 +898,142 @@
   function buildArena() {
     const H = ARENA, wallH = 0.8, wallT = 0.12;
 
+    // ── Sol de base ────────────────────────────────
+    const floorGroup = new THREE.Group();
+    floorGroup.name = 'ground';
+
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x050b12, metalness: 0.9, roughness: 0.3
+    });
+    const floorBase = new THREE.Mesh(new THREE.PlaneGeometry(H*2, H*2), floorMat);
+    floorBase.rotation.x = -Math.PI / 2;
+    floorBase.receiveShadow = true;
+    floorGroup.add(floorBase);
+
+    // ── Dalles (panneaux 2×2) ──────────────────────
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x0c1a28, metalness: 0.85, roughness: 0.2
+    });
+    for (let xi = -H; xi < H; xi += 2) {
+      for (let zi = -H; zi < H; zi += 2) {
+        const tile = new THREE.Mesh(
+          new THREE.BoxGeometry(1.90, 0.012, 1.90), panelMat.clone()
+        );
+        tile.position.set(xi + 1, 0.001, zi + 1);
+        tile.receiveShadow = true;
+        floorGroup.add(tile);
+      }
+    }
+
+    // ── Lignes de grille entre les dalles ──────────
+    const lineMat = new THREE.MeshStandardMaterial({
+      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.18
+    });
+    for (let i = -H; i <= H; i += 2) {
+      const lx = new THREE.Mesh(new THREE.BoxGeometry(H*2, 0.003, 0.05), lineMat);
+      lx.position.set(0, 0.003, i);
+      floorGroup.add(lx);
+      const lz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.003, H*2), lineMat);
+      lz.position.set(i, 0.003, 0);
+      floorGroup.add(lz);
+    }
+
+    // ── Zone créateur (sud = +Z) bleutée ───────────
+    const southMat = new THREE.MeshStandardMaterial({
+      color: 0x001833, emissive: 0x003366, emissiveIntensity: 0.45,
+      metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.65
+    });
+    const southZone = new THREE.Mesh(
+      new THREE.BoxGeometry(H*2 - 0.3, 0.007, H - 0.15), southMat
+    );
+    southZone.position.set(0, 0.002, H / 2);
+    floorGroup.add(southZone);
+
+    // ── Zone adversaire (nord = -Z) rougeâtre ──────
+    const northMat = new THREE.MeshStandardMaterial({
+      color: 0x1a0008, emissive: 0x440011, emissiveIntensity: 0.45,
+      metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.65
+    });
+    const northZone = new THREE.Mesh(
+      new THREE.BoxGeometry(H*2 - 0.3, 0.007, H - 0.15), northMat
+    );
+    northZone.position.set(0, 0.002, -H / 2);
+    floorGroup.add(northZone);
+
+    // ── Ligne de centre ────────────────────────────
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.7
+    });
+    const divLine = new THREE.Mesh(
+      new THREE.BoxGeometry(H*2 - 0.2, 0.006, 0.055), accentMat
+    );
+    divLine.position.set(0, 0.004, 0);
+    floorGroup.add(divLine);
+
+    // ── Cercle central ─────────────────────────────
+    const centerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.0, 0.022, 6, 64), accentMat.clone()
+    );
+    centerRing.rotation.x = Math.PI / 2;
+    centerRing.position.y = 0.005;
+    floorGroup.add(centerRing);
+
+    const centerDot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.055, 0.006, 16), accentMat.clone()
+    );
+    centerDot.position.y = 0.003;
+    floorGroup.add(centerDot);
+
+    scene.add(floorGroup);
+
+    // ── Murs ───────────────────────────────────────
     const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x0d1f2d, metalness: 0.75, roughness: 0.4,
-      transparent: true, opacity: 0.92
+      color: 0x0a1825, metalness: 0.8, roughness: 0.35,
+      transparent: true, opacity: 0.95
     });
     const stripMat = new THREE.MeshStandardMaterial({
-      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.7,
-      metalness: 0.9, roughness: 0.1
+      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.8
     });
 
-    // 4 murs : [posX, posZ, largeur, profondeur]
     const walls = [
-      [0, -H, H*2 + wallT*2, wallT],  // Nord
-      [0,  H, H*2 + wallT*2, wallT],  // Sud
-      [-H, 0, wallT, H*2],             // Ouest
-      [ H, 0, wallT, H*2],             // Est
+      [0, -H, H*2 + wallT*2, wallT],
+      [0,  H, H*2 + wallT*2, wallT],
+      [-H, 0, wallT, H*2],
+      [ H, 0, wallT, H*2],
     ];
     walls.forEach(([px, pz, w, d]) => {
       const wall = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), wallMat.clone());
       wall.position.set(px, wallH / 2, pz);
       wall.castShadow = true; wall.receiveShadow = true;
       scene.add(wall);
-      // Strip lumineux sur le dessus
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.025, d), stripMat);
-      strip.position.set(px, wallH + 0.013, pz);
-      scene.add(strip);
+      // Bande lumineuse haute
+      const topStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.022, d), stripMat);
+      topStrip.position.set(px, wallH + 0.011, pz);
+      scene.add(topStrip);
+      // Bande lumineuse basse (sol)
+      const botStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.015, d), stripMat);
+      botStrip.position.set(px, 0.0075, pz);
+      scene.add(botStrip);
     });
 
-    // Piliers d'angle
+    // ── Piliers d'angle ────────────────────────────
     [[-H,-H],[H,-H],[-H,H],[H,H]].forEach(([x, z]) => {
-      const p = new THREE.Mesh(
-        new THREE.BoxGeometry(wallT*2.2, wallH + 0.1, wallT*2.2),
-        wallMat.clone()
+      const pillar = new THREE.Mesh(
+        new THREE.BoxGeometry(wallT*2.2, wallH + 0.15, wallT*2.2), wallMat.clone()
       );
-      p.position.set(x, (wallH + 0.1) / 2, z);
-      scene.add(p);
+      pillar.position.set(x, (wallH + 0.15) / 2, z);
+      scene.add(pillar);
       const cap = new THREE.Mesh(
-        new THREE.BoxGeometry(wallT*2.6, 0.04, wallT*2.6),
-        stripMat
+        new THREE.BoxGeometry(wallT*2.8, 0.04, wallT*2.8), stripMat
       );
-      cap.position.set(x, wallH + 0.12, z);
+      cap.position.set(x, wallH + 0.17, z);
       scene.add(cap);
+      // Filet vertical lumineux sur l'arête
+      const vStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.014, wallH, 0.014), stripMat
+      );
+      vStrip.position.set(x, wallH / 2, z);
+      scene.add(vStrip);
     });
   }
 
@@ -1014,6 +1118,7 @@
                                jumpY: 0, jumpVel: 0,
                                hp: p.hp ?? 100, maxHP: p.maxHP ?? 100, lastAtkT: 0 };
           scene.add(group);
+          updateHPBars();
         } else {
           const r = remoteRobots[id];
           r.targetX = p.x; r.targetZ = p.z; r.targetRy = p.ry;
@@ -1143,15 +1248,7 @@
     fillLight.position.set(-4, 2, -4);
     scene.add(fillLight);
 
-    // Sol + grille
-    const grid = new THREE.GridHelper(ARENA*2, ARENA*2, 0x004455, 0x001a22);
-    grid.name = 'grid'; scene.add(grid);
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(ARENA*2, ARENA*2),
-      new THREE.MeshStandardMaterial({ color:0x050c12, roughness:1, metalness:0.1 })
-    );
-    ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; ground.name = 'ground';
-    scene.add(ground);
+    // Sol et arène (construits par buildArena)
 
     buildArena();
     buildRobot();
@@ -1187,8 +1284,8 @@
       const xrRefSpace = await xrSession.requestReferenceSpace('viewer');
       xrHitTestSource = await xrSession.requestHitTestSource({space:xrRefSpace});
       xrSession.addEventListener('end',()=>{ xrHitTestSource=null; xrSession=null; });
-      scene.getObjectByName('grid').visible = false;
-      scene.getObjectByName('ground').visible = false;
+      const _gridObj = scene.getObjectByName('grid'); if (_gridObj) _gridObj.visible = false;
+      const _groundObj = scene.getObjectByName('ground'); if (_groundObj) _groundObj.visible = false;
       robotGroup.visible = false;
       buildReticle();
       $('reticle-hint').classList.remove('hidden');
@@ -1808,10 +1905,15 @@
   function updateStats() {
     const w = PIECES.wheels.options[PIECES.wheels.current];
     const b = PIECES.body.options[PIECES.body.current];
-    const speedPips = Math.max(1, Math.round(w.speed * b.speed / (1.4 * 1.2) * 4) + 1);
-    const hpPips    = Math.max(1, Math.round(w.armor * b.armor / (1.6 * 1.5) * 4) + 1);
-    renderPips('stat-speed', Math.min(5, speedPips), false);
-    renderPips('stat-hp',    Math.min(5, hpPips),    hpPips <= 1);
+    const f = PIECES.front.options[PIECES.front.current];
+    const speedPips   = Math.max(1, Math.round(w.speed * b.speed / (1.4 * 1.2) * 4) + 1);
+    const hpPips      = Math.max(1, Math.round(w.armor * b.armor / (1.6 * 1.5) * 4) + 1);
+    const dmgPips     = Math.max(1, Math.min(5, Math.round(f.attack / 1.5 * 5)));
+    const cadencePips = Math.max(1, Math.min(5, Math.round((1 - (f.cooldownMs - 700) / 800) * 4) + 1));
+    renderPips('stat-speed',  Math.min(5, speedPips), false);
+    renderPips('stat-hp',     Math.min(5, hpPips),    hpPips <= 1);
+    renderPips('stat-dmg',    dmgPips,                false);
+    renderPips('stat-rate',   cadencePips,            false);
   }
 
   function renderPips(id, count, warn) {
