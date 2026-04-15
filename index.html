@@ -51,7 +51,7 @@
     .corner-bl { bottom:8px; left:8px; border-bottom:1px solid var(--cyan); border-left:1px solid var(--cyan); opacity:.4; }
     .corner-br { bottom:8px; right:8px; border-bottom:1px solid var(--cyan); border-right:1px solid var(--cyan); opacity:.4; }
     /* Joystick */
-    #joystick-zone { position:fixed; bottom:24px; left:24px; z-index:30; touch-action:none; }
+    #joystick-zone { position:fixed; bottom:24px; right:24px; z-index:30; touch-action:none; }
     #joystick-base { width:120px; height:120px; border-radius:50%;
       background:rgba(0,0,0,0.5); border:1.5px solid rgba(0,245,255,0.2);
       display:flex; align-items:center; justify-content:center; position:relative;
@@ -61,8 +61,6 @@
       border:1.5px solid rgba(0,245,255,0.5); position:absolute;
       box-shadow:0 0 12px rgba(0,245,255,0.3); }
     /* Right controls */
-    #controls-right { position:fixed; bottom:24px; right:24px; z-index:30;
-      display:flex; flex-direction:column; gap:10px; align-items:flex-end; }
     .ctrl-btn { font-family:var(--font-mono); font-size:11px; letter-spacing:.1em;
       color:var(--cyan); background:rgba(0,0,0,0.5); border:1.5px solid rgba(0,245,255,0.2);
       border-radius:4px; padding:9px 14px; cursor:pointer; backdrop-filter:blur(8px);
@@ -212,6 +210,31 @@
       border:2px solid transparent; flex-shrink:0;
       transition:transform .15s,border-color .15s,box-shadow .15s; }
     .cust-swatch.sel { border-color:#fff; transform:scale(1.2); }
+
+    /* ── Jeu en cours ── */
+    #game-controls { position:fixed; top:60px; right:16px; z-index:30;
+      display:none; flex-direction:column; gap:8px; align-items:flex-end; }
+    #btn-attack { position:fixed; bottom:24px; left:24px; z-index:30; width:100px; height:100px;
+      border-radius:50%; background:rgba(200,30,30,0.12); border:2px solid rgba(255,60,60,0.3);
+      font-size:30px; color:rgba(255,80,60,0.85); cursor:pointer; display:none;
+      align-items:center; justify-content:center; backdrop-filter:blur(8px);
+      -webkit-user-select:none; user-select:none; transition:background .1s,border-color .1s,box-shadow .1s; }
+    #btn-attack.ready { border-color:rgba(255,60,60,0.75); box-shadow:0 0 18px rgba(255,50,40,0.45); }
+    #btn-attack.cooling { opacity:0.35; }
+    #btn-attack:active { background:rgba(200,30,30,0.35); }
+    #hp-enemy-wrap { position:fixed; top:52px; left:16px; right:16px; z-index:25;
+      display:none; flex-direction:column; gap:3px; }
+    #hp-me-wrap { position:fixed; bottom:16px; left:160px; right:160px; z-index:25;
+      display:none; flex-direction:column; gap:3px; }
+    .hp-bg { height:7px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; }
+    .hp-fill { height:100%; border-radius:3px; width:100%; transition:width 0.25s ease-out; }
+    #hp-fill-me { background:linear-gradient(90deg,#00cc55,#00ff88);
+      box-shadow:0 0 6px rgba(0,255,136,0.5); }
+    #hp-fill-enemy { background:linear-gradient(90deg,#cc2200,#ff4422);
+      box-shadow:0 0 6px rgba(255,68,34,0.4); }
+    .hp-label { font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; }
+    #hp-label-me { color:rgba(0,255,136,0.55); text-align:center; }
+    #hp-label-enemy { color:rgba(255,68,34,0.55); text-align:center; }
   </style>
 </head>
 <body>
@@ -260,11 +283,21 @@
     <div id="joystick-base"><div id="joystick-thumb"></div></div>
   </div>
 
-  <div id="controls-right">
-    <button class="ctrl-btn" id="btn-reset">↺ RESET</button>
-    <button class="ctrl-btn" id="btn-rotate-l">⟲ ROT L</button>
-    <button class="ctrl-btn" id="btn-rotate-r">ROT R ⟳</button>
-    <button class="ctrl-btn" id="btn-invite" onclick="copyInvite()">⬆ INVITE</button>
+  <button id="btn-attack">⚔</button>
+
+  <!-- HP bars -->
+  <div id="hp-enemy-wrap">
+    <div class="hp-label" id="hp-label-enemy">ADVERSAIRE</div>
+    <div class="hp-bg"><div class="hp-fill" id="hp-fill-enemy"></div></div>
+  </div>
+  <div id="hp-me-wrap">
+    <div class="hp-bg"><div class="hp-fill" id="hp-fill-me"></div></div>
+    <div class="hp-label" id="hp-label-me">VIE</div>
+  </div>
+
+  <div id="game-controls">
+    <button class="ctrl-btn" id="btn-invite-game">⬆ INVITE</button>
+    <button class="ctrl-btn" id="btn-quit-game">✕ QUITTER</button>
   </div>
 
   <div id="splash">
@@ -373,6 +406,16 @@
   const ROBOT_RADIUS = 0.32;
   const PUSH_STRENGTH = 0.10; // vitesse initiale de poussée (unités/frame)
   const PUSH_DECAY = 0.80;    // friction par frame
+
+  let myHP = 100, myMaxHP = 100;
+  let gameOver = false;
+  let isCreator = false;
+  let camSide = 1;
+  let attackCooldown = 0;      // timestamp (ms) when cooldown expires
+  let attackAnim = null;        // { group, origZ, phase, t0 }
+  let lastAttackPublished = null; // { t, dmg } pending publish
+  const ATTACK_RANGE = 1.5;
+  const BASE_ATTACK_DMG = 20;
 
   // Couleur du robot (affecte MAT.accent + MAT.orange)
   let robotColorId = 'cyan';
@@ -583,7 +626,7 @@
           name: 'Pelle',
           icon: '🔨',
           stats: 'Attaque zone / Poids ++',
-          attack: 1.2, weight: 1.4,
+          attack: 1.5, weight: 1.4, cooldownMs: 1500,
           build() {
             const group = new THREE.Group();
             group.name = 'front';
@@ -608,7 +651,7 @@
           name: 'Pic',
           icon: '⚡',
           stats: 'Attaque perçage / Poids +',
-          attack: 1.8, weight: 0.8,
+          attack: 1.0, weight: 0.8, cooldownMs: 700,
           build() {
             const group = new THREE.Group();
             group.name = 'front';
@@ -634,6 +677,12 @@
       }
     }
   };
+
+  function calcMaxHP() {
+    const w = PIECES.wheels.options[PIECES.wheels.current];
+    const b = PIECES.body.options[PIECES.body.current];
+    return Math.round(w.armor * b.armor * 100);
+  }
 
   // Positions des roues (réutilisées par les deux variantes)
   const WHEEL_POSITIONS = [[-0.17,0.07,0.11],[0.17,0.07,0.11],[-0.17,0.07,-0.11],[0.17,0.07,-0.11]];
@@ -926,15 +975,18 @@
 
   function publishPosition() {
     const now = Date.now();
-    if (now - lastPublish < 66) return; // ~15 fps
+    if (now - lastPublish < 66) return;
     lastPublish = now;
-    db.ref('rooms/' + roomId + '/players/' + myId).set({
+    const payload = {
       x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
-      wheels: PIECES.wheels.current,
-      body:   PIECES.body.current,
-      front:  PIECES.front.current,
-      ts: now
-    });
+      wheels: PIECES.wheels.current, body: PIECES.body.current, front: PIECES.front.current,
+      hp: myHP, maxHP: myMaxHP, ts: now
+    };
+    if (lastAttackPublished) {
+      payload.atk = lastAttackPublished;
+      lastAttackPublished = null;
+    }
+    db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
   }
 
   function setupFirebase() {
@@ -959,7 +1011,8 @@
           remoteRobots[id] = { group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
                                lerpX: p.x, lerpZ: p.z, pushOffX: 0, pushOffZ: 0,
                                wheels: p.wheels, body: p.body, front: p.front,
-                               jumpY: 0, jumpVel: 0 };
+                               jumpY: 0, jumpVel: 0,
+                               hp: p.hp ?? 100, maxHP: p.maxHP ?? 100, lastAtkT: 0 };
           scene.add(group);
         } else {
           const r = remoteRobots[id];
@@ -973,6 +1026,22 @@
             r.wheels = p.wheels; r.body = p.body; r.front = p.front;
             scene.add(r.group);
           }
+          // Check attack hit
+          if (p.atk && p.atk.t !== r.lastAtkT && !gameOver) {
+            r.lastAtkT = p.atk.t;
+            const dx = robotPos.x - r.lerpX;
+            const dz = robotPos.z - r.lerpZ;
+            if (Math.sqrt(dx*dx + dz*dz) < ATTACK_RANGE) {
+              myHP = Math.max(0, myHP - p.atk.dmg);
+              updateHPBars();
+              if (myHP <= 0) endGame(false);
+            }
+          }
+          // Enemy HP
+          r.hp = p.hp ?? r.hp;
+          r.maxHP = p.maxHP ?? r.maxHP;
+          if (r.hp <= 0 && !gameOver) endGame(true);
+          updateHPBars();
         }
       });
 
@@ -984,6 +1053,64 @@
     window.addEventListener('beforeunload', () => {
       db.ref('rooms/' + roomId + '/players/' + myId).remove();
     });
+  }
+
+  function updateHPBars() {
+    const myPct = myMaxHP > 0 ? (myHP / myMaxHP * 100) : 0;
+    $('hp-fill-me').style.width = myPct + '%';
+    $('hp-label-me').textContent = myHP + ' / ' + myMaxHP;
+    const enemy = Object.values(remoteRobots)[0];
+    if (enemy && enemy.maxHP > 0) {
+      const ePct = (enemy.hp / enemy.maxHP * 100);
+      $('hp-fill-enemy').style.width = ePct + '%';
+      $('hp-label-enemy').textContent = enemy.hp + ' / ' + enemy.maxHP;
+    }
+  }
+
+  function endGame(won) {
+    if (gameOver) return;
+    gameOver = true;
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;' +
+      'align-items:center;justify-content:center;background:rgba(5,8,16,0.95);gap:24px;';
+    const col = won ? '#00f5ff' : '#ff4422';
+    ov.innerHTML = `
+      <div style="font-family:'Share Tech Mono',monospace;font-size:clamp(24px,7vw,38px);
+        color:${col};text-shadow:0 0 30px ${col};letter-spacing:.15em;text-align:center;">
+        ${won ? '[ VICTOIRE ]' : '[ DÉFAITE ]'}
+      </div>
+      <button onclick="location.reload()" style="font-family:'Share Tech Mono',monospace;
+        font-size:13px;color:#0a0a0f;background:#00f5ff;border:none;padding:13px 36px;
+        border-radius:2px;cursor:pointer;box-shadow:0 0 20px rgba(0,245,255,0.4);">
+        [ REJOUER ]
+      </button>`;
+    document.body.appendChild(ov);
+  }
+
+  function doAttack() {
+    if (gameOver || attackAnim) return;
+    const now = Date.now();
+    if (now < attackCooldown) return;
+    const frontOpt = PIECES.front.options[PIECES.front.current];
+    const dmg = Math.round(frontOpt.attack * BASE_ATTACK_DMG);
+    attackCooldown = now + frontOpt.cooldownMs;
+    // Animation
+    const fg = robotGroup?.getObjectByName('front');
+    if (fg) attackAnim = { group: fg, origZ: fg.position.z, phase: 'out', t0: now };
+    // Force-publish attack immediately
+    lastAttackPublished = { t: now, dmg };
+    const payload = {
+      x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
+      wheels: PIECES.wheels.current, body: PIECES.body.current, front: PIECES.front.current,
+      hp: myHP, maxHP: myMaxHP, atk: { t: now, dmg }, ts: now
+    };
+    if (roomId) db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
+    lastPublish = now;
+    // Cooldown visual
+    const ab = $('btn-attack');
+    ab.classList.remove('ready'); ab.classList.add('cooling');
+    setTimeout(() => { ab.classList.remove('cooling'); if (!gameOver) ab.classList.add('ready'); },
+      frontOpt.cooldownMs);
   }
 
   // ═══════════════════════════════════════════════
@@ -1152,11 +1279,26 @@
   async function start() {
     custRunning = false; // arrêter le rendu du customiseur
     $('splash').classList.add('hidden');
+    camSide = isCreator ? 1 : -1;
+    CAM_FIXED.z = 3.6 * camSide;
+    robotPos.x = 0;
+    robotPos.z = 2.5 * camSide;
+    robotPos.ry = isCreator ? Math.PI : 0;
+    camYaw = isCreator ? 0 : Math.PI;
+    myMaxHP = calcMaxHP();
+    myHP = myMaxHP;
     try {
     dbgLog('initThree...');
     initThree();
     dbgLog('initThree OK');
     setupFirebase();
+    // Show game UI
+    $('game-controls').style.display = 'flex';
+    $('btn-attack').style.display = 'flex';
+    $('btn-attack').classList.add('ready');
+    $('hp-enemy-wrap').style.display = 'flex';
+    $('hp-me-wrap').style.display = 'flex';
+    updateHPBars();
     dbgLog('startAR...');
     const arOk = await startAR();
     dbgLog('AR: ' + arOk);
@@ -1260,6 +1402,20 @@
         jumpVel -= GRAVITY;
         jumpY = Math.max(0, jumpY + jumpVel);
         if (jumpY <= 0) { jumpY = 0; jumpVel = 0; }
+      }
+
+      // Attack animation
+      if (attackAnim) {
+        const el = Date.now() - attackAnim.t0;
+        if (attackAnim.phase === 'out') {
+          const t = Math.min(1, el / 80);
+          attackAnim.group.position.z = attackAnim.origZ + 0.2 * (1 - Math.pow(1-t, 2));
+          if (t >= 1) { attackAnim.phase = 'in'; attackAnim.t0 = Date.now(); }
+        } else {
+          const t = Math.min(1, el / 160);
+          attackAnim.group.position.z = attackAnim.origZ + 0.2 * (1 - t);
+          if (t >= 1) { attackAnim.group.position.z = attackAnim.origZ; attackAnim = null; }
+        }
       }
 
       robotGroup.position.x = robotPos.x;
@@ -1756,22 +1912,6 @@
   window.addEventListener('mousemove',e=>{if(jActive)jMove(e);});
   window.addEventListener('mouseup',jEnd);
 
-  // ── Rotate buttons ────────────────────────────
-  function holdBtn(id, onDown, onUp){
-    let iv=null;
-    const el=$(id);
-    el.addEventListener('touchstart',e=>{e.preventDefault();onDown();iv=setInterval(onDown,16);el.classList.add('active');},{passive:false});
-    el.addEventListener('touchend',()=>{clearInterval(iv);onUp();el.classList.remove('active');});
-    el.addEventListener('mousedown',()=>{onDown();iv=setInterval(onDown,16);el.classList.add('active');});
-    window.addEventListener('mouseup',()=>{clearInterval(iv);onUp();el.classList.remove('active');});
-  }
-  holdBtn('btn-rotate-l',()=>{move.rotY=1;},()=>{move.rotY=0;});
-  holdBtn('btn-rotate-r',()=>{move.rotY=-1;},()=>{move.rotY=0;});
-
-  $('btn-reset').addEventListener('click',()=>{
-    robotPos.x=0; robotPos.z=0; robotPos.ry=0;
-    robotGroup.position.set(0,0,0); robotGroup.rotation.y=0;
-  });
 
   // ── Keyboard ──────────────────────────────────
   const keys={};
@@ -1797,12 +1937,13 @@
     setTimeout(() => $('code-input').focus(), 100);
   });
 
-  $('btn-start-create').addEventListener('click', start);
+  $('btn-start-create').addEventListener('click', () => { isCreator = true; start(); });
 
   $('btn-start-join').addEventListener('click', () => {
     const code = $('code-input').value.trim().toUpperCase();
     if (code.length < 3) { $('code-input').style.borderColor='#ff4444'; return; }
     roomId = code;
+    isCreator = false;
     start();
   });
 
@@ -1840,6 +1981,16 @@
     $('view-customize').style.display = 'none';
     $('view-menu').style.display      = 'flex';
     custRunning = false;
+  });
+
+  $('btn-attack').addEventListener('click', doAttack);
+  $('btn-attack').addEventListener('touchstart', e => { e.preventDefault(); doAttack(); }, { passive: false });
+  $('btn-invite-game').addEventListener('click', copyInvite);
+  $('btn-quit-game').addEventListener('click', () => {
+    if (confirm('Quitter la partie ?')) {
+      if (roomId) db.ref('rooms/' + roomId + '/players/' + myId).remove();
+      location.reload();
+    }
   });
 
   // Service Worker
