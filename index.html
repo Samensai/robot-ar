@@ -529,6 +529,10 @@
   const move = { x:0, z:0, rotY:0 };
   const robotPos = { x:0, z:0, ry:0 };
   const SPEED = 0.04, ROT_SPEED = 0.04, ROT_SMOOTH = 0.18;
+  let arenaZones = { boost: [], slick: [] };
+  let arenaColliders = [];
+  let arenaAnimators = [];
+  let arenaDriftX = 0, arenaDriftZ = 0;
 
   // Caméra fixe + gyro (quaternion approach)
   const CAM_FIXED = { x:0, y:1.6, z:3.6 }; // à l'intérieur, bord sud, hauteur d'œil
@@ -1510,6 +1514,166 @@
   //  ARÈNE
   // ═══════════════════════════════════════════════
 
+  function resetArenaGameplay() {
+    arenaZones = { boost: [], slick: [] };
+    arenaColliders = [];
+    arenaAnimators = [];
+    arenaDriftX = 0;
+    arenaDriftZ = 0;
+  }
+
+  function registerArenaZone(type, zone) {
+    if (!arenaZones[type]) arenaZones[type] = [];
+    arenaZones[type].push(zone);
+  }
+
+  function registerArenaCollider(collider) {
+    arenaColliders.push(collider);
+  }
+
+  function addArenaZoneDisc(parent, type, {
+    x = 0, z = 0, radius = 0.6, color = 0xffffff, emissive = color,
+    opacity = 0.3, y = 0.008, ring = true, pulse = 0.15
+  } = {}) {
+    const zoneMat = new THREE.MeshStandardMaterial({
+      color, emissive, emissiveIntensity: 0.35, transparent: true, opacity, roughness: 0.35, metalness: 0.2
+    });
+    const zone = new THREE.Mesh(new THREE.CircleGeometry(radius, 32), zoneMat);
+    zone.rotation.x = -Math.PI / 2;
+    zone.position.set(x, y, z);
+    parent.add(zone);
+    let halo = null;
+    if (ring) {
+      halo = new THREE.Mesh(
+        new THREE.TorusGeometry(radius * 0.96, Math.max(0.015, radius * 0.06), 8, 48),
+        new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.65, roughness: 0.18, metalness: 0.25, transparent: true, opacity: 0.88 })
+      );
+      halo.rotation.x = Math.PI / 2;
+      halo.position.set(x, y + 0.004, z);
+      parent.add(halo);
+    }
+    arenaAnimators.push(now => {
+      const t = now * 0.0015 + x * 0.7 + z * 0.3;
+      zone.material.emissiveIntensity = 0.24 + Math.sin(t) * pulse;
+      if (halo) {
+        halo.scale.setScalar(1 + Math.sin(t * 1.2) * 0.03);
+        halo.material.emissiveIntensity = 0.52 + Math.sin(t * 1.3) * 0.16;
+      }
+    });
+    registerArenaZone(type, { x, z, radius });
+    return zone;
+  }
+
+  function addArenaCylinderObstacle(parent, {
+    x = 0, z = 0, radius = 0.32, height = 0.7, color = 0x445566, emissive = 0x000000,
+    accentColor = null, wobble = 0
+  } = {}) {
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius * 1.06, height, 18),
+      new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.18, roughness: 0.45, metalness: 0.25 })
+    );
+    body.position.set(x, height / 2, z);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    parent.add(body);
+    if (accentColor) {
+      const cap = new THREE.Mesh(
+        new THREE.TorusGeometry(radius * 1.02, Math.max(0.018, radius * 0.1), 8, 26),
+        new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.38, roughness: 0.22, metalness: 0.2 })
+      );
+      cap.rotation.x = Math.PI / 2;
+      cap.position.set(x, height + 0.02, z);
+      parent.add(cap);
+      arenaAnimators.push(now => {
+        const t = now * 0.001 + x * 0.6 - z * 0.4;
+        cap.rotation.z = Math.sin(t) * 0.12;
+        cap.material.emissiveIntensity = 0.28 + Math.sin(t * 1.6) * 0.1;
+      });
+    }
+    if (wobble) {
+      arenaAnimators.push(now => {
+        body.position.y = height / 2 + Math.sin(now * 0.0011 + x) * wobble;
+      });
+    }
+    registerArenaCollider({ type: 'circle', x, z, radius });
+    return body;
+  }
+
+  function addArenaBoxObstacle(parent, {
+    x = 0, z = 0, width = 0.5, depth = 0.5, height = 0.5, color = 0x445566, emissive = 0x000000,
+    accentColor = null, floatAmp = 0
+  } = {}) {
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.18, roughness: 0.52, metalness: 0.2 })
+    );
+    body.position.set(x, height / 2, z);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    parent.add(body);
+    if (accentColor) {
+      const line = new THREE.Mesh(
+        new THREE.BoxGeometry(width * 1.04, 0.025, depth * 1.04),
+        new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.42, roughness: 0.25, metalness: 0.25 })
+      );
+      line.position.set(x, height + 0.018, z);
+      parent.add(line);
+      arenaAnimators.push(now => {
+        line.material.emissiveIntensity = 0.34 + Math.sin(now * 0.0014 + x) * 0.12;
+        if (floatAmp) line.position.y = height + 0.018 + Math.sin(now * 0.0012 + z) * floatAmp;
+      });
+    }
+    registerArenaCollider({ type: 'box', x, z, halfW: width / 2, halfD: depth / 2 });
+    return body;
+  }
+
+  function getArenaSurfaceEffects(x, z) {
+    const effect = { boost: false, slick: false };
+    (arenaZones.boost || []).forEach(zone => {
+      const dx = x - zone.x;
+      const dz = z - zone.z;
+      if (dx * dx + dz * dz <= zone.radius * zone.radius) effect.boost = true;
+    });
+    (arenaZones.slick || []).forEach(zone => {
+      const dx = x - zone.x;
+      const dz = z - zone.z;
+      if (dx * dx + dz * dz <= zone.radius * zone.radius) effect.slick = true;
+    });
+    return effect;
+  }
+
+  function resolveArenaCollisions() {
+    arenaColliders.forEach(col => {
+      if (col.type === 'circle') {
+        const dx = robotPos.x - col.x;
+        const dz = robotPos.z - col.z;
+        const dist = Math.sqrt(dx * dx + dz * dz) || 0.0001;
+        const minDist = col.radius + ROBOT_RADIUS;
+        if (dist < minDist) {
+          const push = minDist - dist;
+          robotPos.x += (dx / dist) * push;
+          robotPos.z += (dz / dist) * push;
+        }
+      } else if (col.type === 'box') {
+        const nearestX = THREE.MathUtils.clamp(robotPos.x, col.x - col.halfW, col.x + col.halfW);
+        const nearestZ = THREE.MathUtils.clamp(robotPos.z, col.z - col.halfD, col.z + col.halfD);
+        const dx = robotPos.x - nearestX;
+        const dz = robotPos.z - nearestZ;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < ROBOT_RADIUS * ROBOT_RADIUS) {
+          const penX = ROBOT_RADIUS - Math.abs(dx);
+          const penZ = ROBOT_RADIUS - Math.abs(dz);
+          if (penX < penZ) robotPos.x += dx >= 0 ? penX : -penX;
+          else robotPos.z += dz >= 0 ? penZ : -penZ;
+        }
+      }
+    });
+  }
+
+  function updateArenaDynamics(now) {
+    arenaAnimators.forEach(fn => fn(now));
+  }
+
   function addArenaWalls(parent, H, wallH, wallT, wallMat, stripMat) {
     const walls = [
       [0, -H, H*2 + wallT*2, wallT],
@@ -1604,6 +1768,14 @@
     centerDot.position.y = 0.003;
     parent.add(centerDot);
 
+    addArenaZoneDisc(parent, 'boost', { x: -1.65, z: 0, radius: 0.62, color: 0x26d7ff, emissive: 0x00f5ff, opacity: 0.2 });
+    addArenaZoneDisc(parent, 'boost', { x: 1.65, z: 0, radius: 0.62, color: 0x26d7ff, emissive: 0x00f5ff, opacity: 0.2 });
+    addArenaCylinderObstacle(parent, { x: 0, z: 0, radius: 0.46, height: 0.72, color: 0x102130, emissive: 0x0a2940, accentColor: 0x00f5ff, wobble: 0.015 });
+    addArenaBoxObstacle(parent, { x: -1.15, z: -1.1, width: 0.42, depth: 0.42, height: 0.62, color: 0x0d1c29, emissive: 0x082238, accentColor: 0x00c8ff });
+    addArenaBoxObstacle(parent, { x: 1.15, z: 1.1, width: 0.42, depth: 0.42, height: 0.62, color: 0x0d1c29, emissive: 0x082238, accentColor: 0x00c8ff });
+    addArenaCylinderObstacle(parent, { x: -2.1, z: -0.95, radius: 0.28, height: 0.66, color: 0x091622, emissive: 0x061422, accentColor: 0x00d5ff });
+    addArenaCylinderObstacle(parent, { x: 2.1, z: 0.95, radius: 0.28, height: 0.66, color: 0x091622, emissive: 0x061422, accentColor: 0x00d5ff });
+
     const wallMat = new THREE.MeshStandardMaterial({
       color:0x0a1825, metalness:0.8, roughness:0.35, transparent:true, opacity:0.95
     });
@@ -1653,6 +1825,14 @@
       const center = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 20), ringMat.clone());
       center.position.y = 0.03;
       parent.add(center);
+
+    addArenaZoneDisc(parent, 'boost', { x: -2.25, z: 0, radius: 0.55, color: 0xf6b25a, emissive: 0xff8e2b, opacity: 0.22 });
+    addArenaZoneDisc(parent, 'boost', { x: 2.25, z: 0, radius: 0.55, color: 0xf6b25a, emissive: 0xff8e2b, opacity: 0.22 });
+    addArenaCylinderObstacle(parent, { x: 0, z: 0, radius: 0.52, height: 0.82, color: 0x7a5434, emissive: 0x40210b, accentColor: 0xf3bf6d, wobble: 0.01 });
+    addArenaBoxObstacle(parent, { x: -1.28, z: 1.15, width: 0.46, depth: 0.68, height: 0.56, color: 0x78563b, emissive: 0x3a1d10, accentColor: 0xd99a58 });
+    addArenaBoxObstacle(parent, { x: 1.28, z: -1.15, width: 0.46, depth: 0.68, height: 0.56, color: 0x78563b, emissive: 0x3a1d10, accentColor: 0xd99a58 });
+    addArenaCylinderObstacle(parent, { x: -2.15, z: 1.55, radius: 0.3, height: 0.72, color: 0x6b4a31, emissive: 0x2f1608, accentColor: 0xe4b066 });
+    addArenaCylinderObstacle(parent, { x: 2.15, z: -1.55, radius: 0.3, height: 0.72, color: 0x6b4a31, emissive: 0x2f1608, accentColor: 0xe4b066 });
 
     for (let i = 0; i < 18; i++) {
       const angle = (i / 18) * Math.PI * 2;
@@ -1716,6 +1896,16 @@
     center.rotation.y = Math.PI / 4;
     parent.add(center);
 
+    addArenaZoneDisc(parent, 'slick', { x: -1.75, z: 0, radius: 0.86, color: 0xbef4ff, emissive: 0x7fe6ff, opacity: 0.18 });
+    addArenaZoneDisc(parent, 'slick', { x: 1.75, z: 0, radius: 0.86, color: 0xbef4ff, emissive: 0x7fe6ff, opacity: 0.18 });
+    addArenaZoneDisc(parent, 'boost', { x: 0, z: -2.05, radius: 0.52, color: 0xe7ffff, emissive: 0xa5f5ff, opacity: 0.16 });
+    addArenaZoneDisc(parent, 'boost', { x: 0, z: 2.05, radius: 0.52, color: 0xe7ffff, emissive: 0xa5f5ff, opacity: 0.16 });
+    addArenaCylinderObstacle(parent, { x: 0, z: 0, radius: 0.42, height: 0.94, color: 0x93cee5, emissive: 0x337ca2, accentColor: 0xeaffff, wobble: 0.022 });
+    addArenaBoxObstacle(parent, { x: -1.18, z: -1.22, width: 0.4, depth: 0.84, height: 0.66, color: 0xa4d9ed, emissive: 0x2e7493, accentColor: 0xf2ffff, floatAmp: 0.015 });
+    addArenaBoxObstacle(parent, { x: 1.18, z: 1.22, width: 0.4, depth: 0.84, height: 0.66, color: 0xa4d9ed, emissive: 0x2e7493, accentColor: 0xf2ffff, floatAmp: 0.015 });
+    addArenaCylinderObstacle(parent, { x: -2.05, z: 1.25, radius: 0.28, height: 0.8, color: 0x8bc6db, emissive: 0x2b6884, accentColor: 0xf3ffff });
+    addArenaCylinderObstacle(parent, { x: 2.05, z: -1.25, radius: 0.28, height: 0.8, color: 0x8bc6db, emissive: 0x2b6884, accentColor: 0xf3ffff });
+
     for (let i = 0; i < 12; i++) {
       const shard = new THREE.Mesh(
         new THREE.ConeGeometry(0.08 + (i % 3) * 0.03, 0.45 + (i % 2) * 0.12, 5),
@@ -1735,6 +1925,7 @@
   }
 
   function buildArena() {
+    resetArenaGameplay();
     const H = ARENA, wallH = 0.8, wallT = 0.12;
     const floorGroup = new THREE.Group();
     floorGroup.name = 'ground';
@@ -2560,6 +2751,7 @@
     const now = Date.now();
     updateExplosionBursts(nowPerf);
     updateSpecialButton();
+    updateArenaDynamics(now);
     trimLocalHazards(now);
     cleanupConsumedRemoteHazards(now);
 
@@ -2579,12 +2771,15 @@
         }
       }
       const jLen = Math.sqrt(move.x*move.x + move.z*move.z);
+      const surfaceFx = getArenaSurfaceEffects(robotPos.x, robotPos.z);
+      const zoneBoostMul = surfaceFx.boost ? 1.5 : 1;
 
       const effSpeed = SPEED
         * PIECES.wheels.options[PIECES.wheels.current].speed
         * PIECES.rims.options[PIECES.rims.current].speed
         * PIECES.chassis.options[PIECES.chassis.current].speed
-        * PIECES.body.options[PIECES.body.current].speed;
+        * PIECES.body.options[PIECES.body.current].speed
+        * zoneBoostMul;
 
       if (!specialFx && !isStunned && landscapeMode && jLen > 0.05) {
         // Mode paysage : même logique qu'en portrait, axes pivotés 90°
@@ -2595,6 +2790,10 @@
         const wz = -Math.sin(camYaw)*lx + Math.cos(camYaw)*lz;
         robotPos.x += wx * effSpeed;
         robotPos.z += wz * effSpeed;
+        if (surfaceFx.slick) {
+          arenaDriftX = arenaDriftX * 0.72 + wx * effSpeed * 0.92;
+          arenaDriftZ = arenaDriftZ * 0.72 + wz * effSpeed * 0.92;
+        }
         const targetRy = Math.atan2(wx, wz);
         const da = Math.atan2(Math.sin(targetRy - robotPos.ry), Math.cos(targetRy - robotPos.ry));
         robotPos.ry += da * ROT_SMOOTH;
@@ -2608,11 +2807,26 @@
 
         robotPos.x += wx * effSpeed;
         robotPos.z += wz * effSpeed;
+        if (surfaceFx.slick) {
+          arenaDriftX = arenaDriftX * 0.72 + wx * effSpeed * 0.92;
+          arenaDriftZ = arenaDriftZ * 0.72 + wz * effSpeed * 0.92;
+        }
 
         // Orienter le robot vers la direction de déplacement (smooth)
         const targetRy = Math.atan2(wx, wz);
         const da = Math.atan2(Math.sin(targetRy - robotPos.ry), Math.cos(targetRy - robotPos.ry));
         robotPos.ry += da * ROT_SMOOTH;
+      }
+
+      if (Math.abs(arenaDriftX) > 0.0002 || Math.abs(arenaDriftZ) > 0.0002) {
+        robotPos.x += arenaDriftX;
+        robotPos.z += arenaDriftZ;
+        const driftDecay = surfaceFx.slick ? 0.972 : 0.86;
+        arenaDriftX *= driftDecay;
+        arenaDriftZ *= driftDecay;
+      } else {
+        arenaDriftX = 0;
+        arenaDriftZ = 0;
       }
 
       // Appliquer vélocité de poussée (décroît chaque frame)
@@ -2625,6 +2839,7 @@
       const limit = ARENA - 0.32;
       robotPos.x = THREE.MathUtils.clamp(robotPos.x, -limit, limit);
       robotPos.z = THREE.MathUtils.clamp(robotPos.z, -limit, limit);
+      resolveArenaCollisions();
       const motionX = robotPos.x - prevX;
       const motionZ = robotPos.z - prevZ;
       const localProfile = getCombatProfile();
