@@ -514,11 +514,13 @@
   let shieldUntil = 0;
   let stunUntil = 0;
   let lastAttackPublished = null; // { t, dmg } pending publish
+  let lastOutgoingAttackAt = 0;
   let localHazards = [];
   let hazardLayer = null;
   let localVelX = 0, localVelZ = 0;
   const consumedRemoteHazards = new Map();
   const fxBursts = [];
+  const hitFlashes = [];
   const ATTACK_RANGE = 1.5;
   const BASE_ATTACK_DMG = 20;
   let selectedArenaStyle = 'neon-grid';
@@ -588,6 +590,7 @@
   let arenaColliders = [];
   let arenaAnimators = [];
   let arenaDriftX = 0, arenaDriftZ = 0;
+  const cameraShake = { until: 0, intensity: 0 };
 
   // Caméra fixe + gyro (quaternion approach)
   const CAM_FIXED = { x:0, y:1.6, z:3.6 }; // à l'intérieur, bord sud, hauteur d'œil
@@ -2255,12 +2258,31 @@
                                styles: JSON.stringify(p.styles || {}), fronts: p.fronts || [], frontsSig: JSON.stringify(p.fronts || []),
                                jumpY: 0, jumpVel: 0,
                                hp: p.hp ?? 100, maxHP: p.maxHP ?? 100, invisUntil: p.invisUntil || 0, shieldUntil: p.shieldUntil || 0, stunUntil: p.stunUntil || 0,
-                               frameVx: 0, frameVz: 0, lastAtkT: 0, lastCollisionAt: 0 };
+                               frameVx: 0, frameVz: 0, lastAtkT: 0, lastCollisionAt: 0, moveFx: null, lastNetTs: p.ts || Date.now() };
           scene.add(group);
           updateHPBars();
         } else {
           const r = remoteRobots[id];
+          const prevHp = r.hp;
+          const prevTargetX = r.targetX;
+          const prevTargetZ = r.targetZ;
           r.targetX = p.x; r.targetZ = p.z; r.targetRy = p.ry;
+          const distMove = Math.hypot((p.x ?? 0) - (prevTargetX ?? 0), (p.z ?? 0) - (prevTargetZ ?? 0));
+          const dtNet = Math.max(1, (p.ts || Date.now()) - (r.lastNetTs || 0));
+          if (distMove > 0.55 && dtNet < 280) {
+            const kind = distMove > 1.55 ? 'teleport' : 'dash';
+            r.moveFx = {
+              type: kind,
+              t0: performance.now(),
+              dur: kind === 'teleport' ? 170 : 150,
+              fromX: r.worldX ?? r.group.position.x,
+              fromZ: r.worldZ ?? r.group.position.z,
+              toX: p.x,
+              toZ: p.z
+            };
+            spawnExplosionBurst(new THREE.Vector3(r.moveFx.fromX, 0, r.moveFx.fromZ), kind === 'teleport' ? 0x8c9dff : 0x41d6ff);
+          }
+          r.lastNetTs = p.ts || Date.now();
           // Reconstruire si les pièces ont changé
           if (r.wheels !== p.wheels || r.rims !== p.rims || r.chassis !== p.chassis || r.body !== p.body || r.front !== p.front || r.antenna !== p.antenna
               || r.styles !== JSON.stringify(p.styles || {})) {
@@ -2294,6 +2316,10 @@
           r.invisUntil = p.invisUntil || 0;
           r.shieldUntil = p.shieldUntil || 0;
           r.stunUntil = p.stunUntil || 0;
+          if (r.hp < prevHp) {
+            addHitFlash(r.group, 0xff8a6a, Math.min(1, 0.4 + (prevHp - r.hp) * 0.02), 220);
+            spawnExplosionBurst(new THREE.Vector3(r.group.position.x, 0, r.group.position.z), 0xff7b52);
+          }
           if (r.hp <= 0 && !deathSequenceStarted) {
             deathSequenceStarted = true;
             triggerRobotDeath(r.group, true);
@@ -2361,7 +2387,7 @@
       return 'SPECIAL PRET';
     }
 
-    function showSpecialReadyAlert(text) {
+  function showSpecialReadyAlert(text) {
       const el = $('special-ready-alert');
       if (!el) return;
       if (specialAlertTimer) clearTimeout(specialAlertTimer);
@@ -2400,6 +2426,52 @@
     stunUntil = Math.max(stunUntil, Date.now() + ms);
   }
 
+  function triggerCameraShake(intensity = 0.05, duration = 180) {
+    cameraShake.intensity = Math.max(cameraShake.intensity, intensity);
+    cameraShake.until = Math.max(cameraShake.until, performance.now() + duration);
+  }
+
+  function addHitFlash(group, color = 0xff8a6a, strength = 0.75, duration = 180) {
+    if (!group) return;
+    hitFlashes.push({ group, color, strength, start: performance.now(), duration });
+  }
+
+  function updateHitFlashes(now) {
+    const meshState = new Map();
+    for (let i = hitFlashes.length - 1; i >= 0; i--) {
+      const fx = hitFlashes[i];
+      const t = (now - fx.start) / fx.duration;
+      if (t >= 1 || !fx.group?.parent) {
+        hitFlashes.splice(i, 1);
+        continue;
+      }
+      const pulse = (1 - t) * fx.strength;
+      fx.group.traverse(child => {
+        if (!child.isMesh || !child.material || !('emissive' in child.material)) return;
+        const prev = meshState.get(child) || { intensity: child.material.userData?.baseHitEI ?? child.material.emissiveIntensity ?? 0, color: child.material.emissive.getHex() };
+        prev.intensity = Math.max(prev.intensity, (child.material.userData?.baseHitEI ?? 0.12) + pulse);
+        prev.color = fx.color;
+        meshState.set(child, prev);
+      });
+    }
+    meshState.forEach((state, child) => {
+      if (!child.material.userData) child.material.userData = {};
+      if (child.material.userData.baseHitEI == null) child.material.userData.baseHitEI = child.material.emissiveIntensity ?? 0;
+      if (child.material.userData.baseHitColor == null) child.material.userData.baseHitColor = child.material.emissive.getHex();
+      child.material.emissive.setHex(state.color);
+      child.material.emissiveIntensity = state.intensity;
+    });
+    const touched = new Set(meshState.keys());
+    [robotGroup, ...Object.values(remoteRobots).map(r => r.group)].forEach(group => {
+      group?.traverse(child => {
+        if (!child.isMesh || !child.material || !child.material.userData || child.material.userData.baseHitEI == null) return;
+        if (touched.has(child)) return;
+        child.material.emissive.setHex(child.material.userData.baseHitColor);
+        child.material.emissiveIntensity = child.material.userData.baseHitEI;
+      });
+    });
+  }
+
   function applyIncomingDamage(amount, source, opts = {}) {
     if (gameOver || deathSequenceStarted) return;
     const now = Date.now();
@@ -2413,10 +2485,14 @@
     if (dmg > 0) {
       myHP = Math.max(0, myHP - dmg);
       updateHPBars();
+      addHitFlash(robotGroup, opts.flashColor || 0xff8a6a, Math.min(1, 0.35 + dmg * 0.02), 180 + dmg * 3);
     }
     if (stunMs > 0) applyStun(stunMs);
     if (opts.burstColor) {
       spawnExplosionBurst(new THREE.Vector3(robotPos.x, 0, robotPos.z), opts.burstColor);
+    }
+    if (dmg >= 8 || source === 'collision') {
+      triggerCameraShake(Math.min(0.12, 0.025 + dmg * 0.004), source === 'collision' ? 210 : 150);
     }
     if (myHP <= 0 && !deathSequenceStarted) {
       deathSequenceStarted = true;
@@ -2732,6 +2808,7 @@
     if (now < attackCooldown) return;
     const frontOpt = PIECES.front.options[PIECES.front.current];
     const dmg = Math.round(frontOpt.attack * BASE_ATTACK_DMG);
+    lastOutgoingAttackAt = now;
     attackCooldown = now + frontOpt.cooldownMs;
     // Animation
     const fg = robotGroup?.getObjectByName('front');
@@ -2962,6 +3039,7 @@
     const nowPerf = performance.now();
     const now = Date.now();
     updateExplosionBursts(nowPerf);
+    updateHitFlashes(nowPerf);
     updateSpecialButton();
     updateArenaDynamics(now);
     trimLocalHazards(now);
@@ -3162,7 +3240,17 @@
 
     // Caméra fixe — position constante, rotation gérée par onGyro()
     if(mode==='3d'){
-      camera.position.set(CAM_FIXED.x, CAM_FIXED.y, CAM_FIXED.z);
+      let shakeX = 0, shakeY = 0, shakeZ = 0;
+      if (cameraShake.until > nowPerf) {
+        const left = (cameraShake.until - nowPerf) / Math.max(1, cameraShake.until - (cameraShake.until - 220));
+        const amp = cameraShake.intensity * Math.max(0, Math.min(1, left));
+        shakeX = (Math.random() - 0.5) * amp;
+        shakeY = (Math.random() - 0.5) * amp * 0.65;
+        shakeZ = (Math.random() - 0.5) * amp * 0.45;
+      } else {
+        cameraShake.intensity = 0;
+      }
+      camera.position.set(CAM_FIXED.x + shakeX, CAM_FIXED.y + shakeY, CAM_FIXED.z + shakeZ);
       // Si pas de gyro actif : regarder le robot (lookAt statique)
       if (!gyroActive) camera.lookAt(robotPos.x, 0.2, robotPos.z);
     }
@@ -3172,8 +3260,25 @@
     Object.values(remoteRobots).forEach(r => {
       const prevWorldX = r.worldX ?? r.group.position.x;
       const prevWorldZ = r.worldZ ?? r.group.position.z;
-      r.lerpX += (r.targetX - r.lerpX) * 0.25;
-      r.lerpZ += (r.targetZ - r.lerpZ) * 0.25;
+      if (r.moveFx) {
+        const t = Math.min(1, (nowPerf - r.moveFx.t0) / r.moveFx.dur);
+        const ease = r.moveFx.type === 'teleport'
+          ? (t < 0.5 ? 0.08 : THREE.MathUtils.smoothstep((t - 0.48) / 0.52, 0, 1))
+          : (1 - Math.pow(1 - t, 3));
+        r.lerpX = r.moveFx.fromX + (r.moveFx.toX - r.moveFx.fromX) * ease;
+        r.lerpZ = r.moveFx.fromZ + (r.moveFx.toZ - r.moveFx.fromZ) * ease;
+        if (t >= 1) {
+          if (r.moveFx.type === 'teleport') {
+            spawnExplosionBurst(new THREE.Vector3(r.moveFx.toX, 0, r.moveFx.toZ), 0x8c9dff);
+          }
+          r.lerpX = r.targetX;
+          r.lerpZ = r.targetZ;
+          r.moveFx = null;
+        }
+      } else {
+        r.lerpX += (r.targetX - r.lerpX) * 0.25;
+        r.lerpZ += (r.targetZ - r.lerpZ) * 0.25;
+      }
       const dRy = Math.atan2(Math.sin(r.targetRy - r.group.rotation.y), Math.cos(r.targetRy - r.group.rotation.y));
       r.group.rotation.y += dRy * 0.25;
       r.pushOffX *= PUSH_DECAY;
@@ -3191,6 +3296,9 @@
       r.group.position.set(r.worldX, r.jumpY, r.worldZ);
       r.group.rotation.z = now < (r.stunUntil || 0) ? Math.sin(now * 0.04 + r.worldX) * 0.08 : 0;
       r.group.visible = now >= (r.invisUntil || 0);
+      if (r.moveFx?.type === 'dash') {
+        r.group.position.y += Math.sin(((nowPerf - r.moveFx.t0) / r.moveFx.dur) * Math.PI) * 0.06;
+      }
       const antennaGroup = r.group.getObjectByName('antenna');
       if (antennaGroup) {
         if (r.antenna === 'teleport') antennaGroup.position.x = Math.sin(now * 0.003) * 0.085;
