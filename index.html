@@ -255,7 +255,7 @@
       flex-direction:column; align-items:center; width:auto; gap:4px; }
     /* Barre vie adversaire → côté droit, à gauche des boutons */
     body.ls #hp-enemy-wrap {
-      top:50%; left:auto; right:72px; transform:translateY(-50%);
+      top:56px; left:auto; right:72px; transform:none;
       flex-direction:column; align-items:center; width:auto; gap:4px; }
     body.ls .hp-bg {
       height:clamp(100px,30vh,160px); width:8px; border-radius:3px; }
@@ -335,6 +335,7 @@
   </div>
 
   <div id="game-controls">
+    <button class="ctrl-btn" id="btn-reset-gyro">GYRO ↺</button>
     <button class="ctrl-btn" id="btn-invite-game">⬆ INVITE</button>
     <button class="ctrl-btn" id="btn-quit-game">✕ QUITTER</button>
   </div>
@@ -1419,6 +1420,12 @@
     camYaw = _gyroEul.y;
   }
 
+  function recenterGyro() {
+    if (!gyroActive) return;
+    _baseInv = _devQuat.clone().invert();
+    setStatus('GYRO CENTRE','active');
+  }
+
   // ═══════════════════════════════════════════════
   //  START
   // ═══════════════════════════════════════════════
@@ -2164,6 +2171,8 @@
   $('btn-landscape').addEventListener('touchstart', e => { e.preventDefault(); toggleLandscape(); }, { passive: false });
   $('btn-attack').addEventListener('click', doAttack);
   $('btn-attack').addEventListener('touchstart', e => { e.preventDefault(); doAttack(); }, { passive: false });
+  $('btn-reset-gyro').addEventListener('click', recenterGyro);
+  $('btn-reset-gyro').addEventListener('touchstart', e => { e.preventDefault(); recenterGyro(); }, { passive: false });
   $('btn-invite-game').addEventListener('click', copyInvite);
   $('btn-quit-game').addEventListener('click', () => {
     if (confirm('Quitter la partie ?')) {
