@@ -215,7 +215,18 @@
     #btn-special.ready { border-color:rgba(120,205,255,0.75); box-shadow:0 0 18px rgba(90,185,255,0.35); }
     #btn-special.cooling { opacity:0.35; }
     #btn-special:active { background:rgba(30,120,220,0.35); }
+    #btn-special-ring { position:absolute; inset:-2px; border-radius:50%;
+      background:conic-gradient(rgba(120,205,255,0.88) 0deg, rgba(120,205,255,0.88) 360deg);
+      -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
+      mask:radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px));
+      opacity:.92; pointer-events:none; transition:opacity .15s; }
     #btn-special-label { position:absolute; inset:auto 0 10px 0; font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; text-align:center; }
+    #special-ready-alert { position:fixed; top:64px; left:50%; transform:translateX(-50%);
+      z-index:45; font-family:var(--font-mono); font-size:11px; letter-spacing:.18em;
+      color:#9fe3ff; background:rgba(5,12,24,0.84); border:1px solid rgba(120,205,255,0.28);
+      border-radius:999px; padding:10px 16px; box-shadow:0 0 18px rgba(90,185,255,0.18);
+      opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; }
+    #special-ready-alert.visible { opacity:1; transform:translateX(-50%) translateY(0); }
     #btn-attack { position:fixed; bottom:24px; left:24px; z-index:30; width:100px; height:100px;
       border-radius:50%; background:rgba(200,30,30,0.12); border:2px solid rgba(255,60,60,0.3);
       font-size:30px; color:rgba(255,80,60,0.85); cursor:pointer; display:none;
@@ -303,8 +314,9 @@
   </div>
 
   <button id="btn-landscape">↺ PAYSAGE</button>
-  <button id="btn-special"><span id="btn-special-label">SP</span></button>
+  <button id="btn-special"><span id="btn-special-ring"></span><span id="btn-special-label">SP</span></button>
   <button id="btn-attack"></button>
+  <div id="special-ready-alert"></div>
 
   <!-- HP bars -->
   <div id="hp-enemy-wrap">
@@ -446,8 +458,10 @@
   let landscapeMode = false;
   let attackCooldown = 0;      // timestamp (ms) when cooldown expires
   let attackAnim = null;        // { group, origZ, phase, t0 }
-  let specialCooldown = 0;
-  let specialFx = null;
+    let specialCooldown = 0;
+    let specialReadyPending = false;
+    let specialAlertTimer = null;
+    let specialFx = null;
   let invisUntil = 0;
   let lastAttackPublished = null; // { t, dmg } pending publish
   const fxBursts = [];
@@ -1800,20 +1814,50 @@
     lastPublish = now;
   }
 
-  function getEnemyRobot() {
-    return Object.values(remoteRobots)[0] || null;
-  }
+    function getEnemyRobot() {
+      return Object.values(remoteRobots)[0] || null;
+    }
 
-  function updateSpecialButton() {
-    const btn = $('btn-special');
-    const label = $('btn-special-label');
-    const antenna = PIECES.antenna.options[PIECES.antenna.current];
-    if (!btn || !label || !antenna) return;
-    label.textContent = antenna.abilityLabel;
-    const cooling = Date.now() < specialCooldown || gameOver;
-    btn.classList.toggle('ready', !cooling);
-    btn.classList.toggle('cooling', cooling);
-  }
+    function getSpecialReadyText(antennaKey) {
+      if (antennaKey === 'boost') return 'BOOST PRET';
+      if (antennaKey === 'teleport') return 'TELEPORT PRET';
+      if (antennaKey === 'stealth') return 'INVISIBLE PRET';
+      return 'SPECIAL PRET';
+    }
+
+    function showSpecialReadyAlert(text) {
+      const el = $('special-ready-alert');
+      if (!el) return;
+      if (specialAlertTimer) clearTimeout(specialAlertTimer);
+      el.textContent = text;
+      el.classList.add('visible');
+      specialAlertTimer = setTimeout(() => {
+        el.classList.remove('visible');
+      }, 1400);
+    }
+  
+    function updateSpecialButton() {
+      const btn = $('btn-special');
+      const label = $('btn-special-label');
+      const ring = $('btn-special-ring');
+      const antenna = PIECES.antenna.options[PIECES.antenna.current];
+      if (!btn || !label || !ring || !antenna) return;
+      label.textContent = antenna.abilityLabel;
+      const now = Date.now();
+      const remaining = Math.max(0, specialCooldown - now);
+      const total = Math.max(1, antenna.cooldownMs || 1);
+      const progress = remaining > 0 ? 1 - (remaining / total) : 1;
+      const cooling = remaining > 0 || gameOver;
+      btn.classList.toggle('ready', !cooling);
+      btn.classList.toggle('cooling', cooling);
+      const angle = Math.max(0, Math.min(1, progress)) * 360;
+      ring.style.background = `conic-gradient(rgba(120,205,255,0.92) 0deg, rgba(120,205,255,0.92) ${angle}deg, rgba(120,205,255,0.14) ${angle}deg 360deg)`;
+      ring.style.opacity = cooling ? '0.92' : '1';
+      if (!cooling && specialReadyPending && !gameOver) {
+        showSpecialReadyAlert(getSpecialReadyText(PIECES.antenna.current));
+        specialReadyPending = false;
+      }
+    }
 
   function resolveTeleportTarget(enemy, desiredDist) {
     const margin = 0.38;
@@ -2017,10 +2061,11 @@
       invisUntil = now + 2000;
       publishImmediate();
     }
-    if (!triggered) return;
-    specialCooldown = now + antenna.cooldownMs;
-    updateSpecialButton();
-  }
+      if (!triggered) return;
+      specialCooldown = now + antenna.cooldownMs;
+      specialReadyPending = true;
+      updateSpecialButton();
+    }
 
   // ═══════════════════════════════════════════════
   //  THREE.JS INIT
@@ -2295,6 +2340,8 @@
 
       const antennaGroup = robotGroup.getObjectByName('antenna');
       if (antennaGroup) {
+        const readyPulse = now >= specialCooldown && !gameOver ? (1 + Math.sin(now * 0.014) * 0.08) : 1;
+        antennaGroup.scale.setScalar(readyPulse);
         if (PIECES.antenna.current === 'boost') {
           antennaGroup.position.set(0, 0, 0);
           antennaGroup.children.forEach((child, i) => {
@@ -2309,6 +2356,12 @@
         } else {
           antennaGroup.position.set(0, 0, 0);
         }
+        antennaGroup.traverse(child => {
+          if (!child.isMesh || !child.material || !('emissiveIntensity' in child.material)) return;
+          child.material.emissiveIntensity = now >= specialCooldown && !gameOver
+            ? 0.48 + Math.sin(now * 0.018) * 0.14
+            : 0.18;
+        });
       }
 
       $('stat-x').textContent=robotPos.x.toFixed(2);
