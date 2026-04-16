@@ -458,12 +458,18 @@
   let landscapeMode = false;
   let attackCooldown = 0;      // timestamp (ms) when cooldown expires
   let attackAnim = null;        // { group, origZ, phase, t0 }
-    let specialCooldown = 0;
-    let specialReadyPending = false;
-    let specialAlertTimer = null;
-    let specialFx = null;
+  let specialCooldown = 0;
+  let specialReadyPending = false;
+  let specialAlertTimer = null;
+  let specialFx = null;
   let invisUntil = 0;
+  let shieldUntil = 0;
+  let stunUntil = 0;
   let lastAttackPublished = null; // { t, dmg } pending publish
+  let localHazards = [];
+  let hazardLayer = null;
+  let localVelX = 0, localVelZ = 0;
+  const consumedRemoteHazards = new Map();
   const fxBursts = [];
   const ATTACK_RANGE = 1.5;
   const BASE_ATTACK_DMG = 20;
@@ -1046,7 +1052,7 @@
           name: 'Pelle',
           icon: '🔨',
           stats: 'Attaque zone / Poids ++',
-          attack: 1.3, weight: 1.3, cooldownMs: 1250,
+          attack: 1.3, weight: 1.3, cooldownMs: 1250, collisionBias: 1.16,
           build() {
             const group = new THREE.Group();
             group.name = 'front';
@@ -1071,7 +1077,7 @@
           name: 'Pic',
           icon: '⚡',
           stats: 'Attaque perçage / Poids +',
-          attack: 0.95, weight: 0.82, cooldownMs: 780,
+          attack: 0.95, weight: 0.82, cooldownMs: 780, collisionBias: 1.28,
           build() {
             const group = new THREE.Group();
             group.name = 'front';
@@ -1098,7 +1104,7 @@
           name: 'Scie',
           icon: '◐',
           stats: 'Attaque ++ / Cadence ++',
-          attack: 1.12, weight: 1.0, cooldownMs: 980,
+          attack: 1.12, weight: 1.0, cooldownMs: 980, collisionBias: 1.02,
           build() {
             const group = new THREE.Group();
             group.name = 'front';
@@ -1122,7 +1128,7 @@
           name: 'Marteau',
           icon: '⬟',
           stats: 'Attaque +++ / Cadence +',
-          attack: 1.34, weight: 1.14, cooldownMs: 1160,
+          attack: 1.34, weight: 1.14, cooldownMs: 1160, stunMs: 700, collisionBias: 1.1,
           build() {
             const group = new THREE.Group();
             group.name = 'front';
@@ -1142,6 +1148,61 @@
               cap.userData.pieceType = 'front';
               group.add(cap);
             });
+            return group;
+          }
+        },
+        mine: {
+          name: 'Mine ventouse',
+          icon: '✹',
+          stats: 'Mine explosive / Zone',
+          attack: 1.02, weight: 0.92, cooldownMs: 1500, mode: 'deployMine',
+          hazardDamage: 24, hazardRadius: 0.42, armDelayMs: 550, hazardLifeMs: 14000, deployLimit: 3, stunMs: 260,
+          build() {
+            const group = new THREE.Group();
+            group.name = 'front';
+            group.userData.pieceType = 'front';
+            const rail = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.03, 0.08), MAT.body.clone());
+            rail.position.set(0, 0.08, 0.18);
+            rail.userData.pieceType = 'front';
+            group.add(rail);
+            const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16), MAT.orange.clone());
+            pod.rotation.x = Math.PI / 2;
+            pod.position.set(0, 0.1, 0.26);
+            pod.userData.pieceType = 'front';
+            group.add(pod);
+            [-0.06, 0.06].forEach(x => {
+              const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.06, 0.018), MAT.accent.clone());
+              clamp.position.set(x, 0.1, 0.24);
+              clamp.userData.pieceType = 'front';
+              group.add(clamp);
+            });
+            return group;
+          }
+        },
+        snare: {
+          name: 'Piège de stase',
+          icon: '⌬',
+          stats: 'Piège / Stun',
+          attack: 0.62, weight: 0.9, cooldownMs: 1680, mode: 'deployTrap',
+          hazardDamage: 10, hazardRadius: 0.5, armDelayMs: 420, hazardLifeMs: 12000, deployLimit: 2, stunMs: 1200,
+          build() {
+            const group = new THREE.Group();
+            group.name = 'front';
+            group.userData.pieceType = 'front';
+            const spine = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.08), MAT.body.clone());
+            spine.position.set(0, 0.09, 0.18);
+            spine.userData.pieceType = 'front';
+            group.add(spine);
+            const frame = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.012, 8, 6), MAT.accent.clone());
+            frame.rotation.x = Math.PI / 2;
+            frame.rotation.z = Math.PI / 6;
+            frame.position.set(0, 0.1, 0.27);
+            frame.userData.pieceType = 'front';
+            group.add(frame);
+            const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), MAT.orange.clone());
+            core.position.set(0, 0.1, 0.27);
+            core.userData.pieceType = 'front';
+            group.add(core);
             return group;
           }
         }
@@ -1232,6 +1293,32 @@
             group.add(head);
             return group;
           }
+        },
+        shield: {
+          name: 'Antenne bouclier',
+          icon: '◍',
+          stats: 'Special : bouclier 3s / Recharge 12s',
+          cooldownMs: 12000,
+          abilityLabel: 'SHLD',
+          build() {
+            const group = new THREE.Group();
+            group.name = 'antenna';
+            group.userData.pieceType = 'antenna';
+            const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.15, 8), MAT.body.clone());
+            mast.position.set(0, 0.31, -0.01);
+            mast.userData.pieceType = 'antenna';
+            group.add(mast);
+            const halo = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.01, 10, 22), MAT.accent.clone());
+            halo.rotation.x = Math.PI / 2;
+            halo.position.set(0, 0.41, -0.01);
+            halo.userData.pieceType = 'antenna';
+            group.add(halo);
+            const gem = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 12), MAT.orange.clone());
+            gem.position.set(0, 0.41, -0.01);
+            gem.userData.pieceType = 'antenna';
+            group.add(gem);
+            return group;
+          }
         }
       }
     }
@@ -1243,6 +1330,56 @@
     const c = PIECES.chassis.options[PIECES.chassis.current];
     const b = PIECES.body.options[PIECES.body.current];
     return Math.round(w.armor * r.armor * c.armor * b.armor * 100);
+  }
+
+  function getLoadoutParts(loadout = {}) {
+    return {
+      wheels: PIECES.wheels.options[loadout.wheels || PIECES.wheels.current],
+      rims: PIECES.rims.options[loadout.rims || PIECES.rims.current],
+      chassis: PIECES.chassis.options[loadout.chassis || PIECES.chassis.current],
+      body: PIECES.body.options[loadout.body || PIECES.body.current],
+      front: PIECES.front.options[loadout.front || PIECES.front.current],
+      antenna: PIECES.antenna.options[loadout.antenna || PIECES.antenna.current],
+    };
+  }
+
+  function getCombatProfile(loadout = {}) {
+    const parts = getLoadoutParts(loadout);
+    const speedMul = parts.wheels.speed * parts.rims.speed * parts.chassis.speed * parts.body.speed;
+    const armorMul = parts.wheels.armor * parts.rims.armor * parts.chassis.armor * parts.body.armor;
+    const frontWeight = parts.front.weight || 1;
+    return {
+      ...parts,
+      speedMul,
+      armorMul,
+      mass: 0.92 + armorMul * 1.15 + frontWeight * 0.48,
+      collisionBias: parts.front.collisionBias || 1,
+      attackRange: parts.front.attackRange || ATTACK_RANGE,
+    };
+  }
+
+  function serializeLocalHazards() {
+    return localHazards.map(h => ({
+      id: h.id,
+      type: h.type,
+      x: h.x,
+      z: h.z,
+      armedAt: h.armedAt,
+      expiresAt: h.expiresAt,
+      damage: h.damage,
+      stunMs: h.stunMs,
+      radius: h.radius
+    }));
+  }
+
+  function trimLocalHazards(now = Date.now()) {
+    localHazards = localHazards.filter(h => now < h.expiresAt);
+  }
+
+  function cleanupConsumedRemoteHazards(now = Date.now()) {
+    consumedRemoteHazards.forEach((expiresAt, key) => {
+      if (now > expiresAt) consumedRemoteHazards.delete(key);
+    });
   }
 
   function saveRobotConfig() {
@@ -1689,11 +1826,12 @@
     const now = Date.now();
     if (now - lastPublish < 66) return;
     lastPublish = now;
+    trimLocalHazards(now);
     const payload = {
       x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
       wheels: PIECES.wheels.current, rims: PIECES.rims.current, chassis: PIECES.chassis.current,
       body: PIECES.body.current, front: PIECES.front.current, antenna: PIECES.antenna.current, styles: pieceStyles,
-      hp: myHP, maxHP: myMaxHP, invisUntil, ts: now
+      hp: myHP, maxHP: myMaxHP, invisUntil, shieldUntil, stunUntil, fronts: serializeLocalHazards(), ts: now
     };
     if (lastAttackPublished) {
       payload.atk = lastAttackPublished;
@@ -1721,12 +1859,13 @@
         if (id === myId) return;
         if (!remoteRobots[id]) {
           const group = buildRemoteRobot(p);
-          remoteRobots[id] = { group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
+          remoteRobots[id] = { id, group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
                                lerpX: p.x, lerpZ: p.z, pushOffX: 0, pushOffZ: 0,
                                wheels: p.wheels, rims: p.rims, chassis: p.chassis, body: p.body, front: p.front, antenna: p.antenna,
-                               styles: JSON.stringify(p.styles || {}),
+                               styles: JSON.stringify(p.styles || {}), fronts: p.fronts || [], frontsSig: JSON.stringify(p.fronts || []),
                                jumpY: 0, jumpVel: 0,
-                               hp: p.hp ?? 100, maxHP: p.maxHP ?? 100, invisUntil: p.invisUntil || 0, lastAtkT: 0 };
+                               hp: p.hp ?? 100, maxHP: p.maxHP ?? 100, invisUntil: p.invisUntil || 0, shieldUntil: p.shieldUntil || 0, stunUntil: p.stunUntil || 0,
+                               frameVx: 0, frameVz: 0, lastAtkT: 0, lastCollisionAt: 0 };
           scene.add(group);
           updateHPBars();
         } else {
@@ -1743,24 +1882,28 @@
             r.styles = JSON.stringify(p.styles || {});
             scene.add(r.group);
           }
+          if (r.frontsSig !== JSON.stringify(p.fronts || [])) {
+            r.fronts = p.fronts || [];
+            r.frontsSig = JSON.stringify(p.fronts || []);
+          }
           // Check attack hit
           if (p.atk && p.atk.t !== r.lastAtkT && !gameOver) {
             r.lastAtkT = p.atk.t;
             const dx = robotPos.x - r.lerpX;
             const dz = robotPos.z - r.lerpZ;
-            if (Math.sqrt(dx*dx + dz*dz) < ATTACK_RANGE) {
-              myHP = Math.max(0, myHP - p.atk.dmg);
-              updateHPBars();
-              if (myHP <= 0 && !deathSequenceStarted) {
-                deathSequenceStarted = true;
-                triggerRobotDeath(robotGroup, false);
-              }
+            if (Math.sqrt(dx*dx + dz*dz) < (p.atk.range || ATTACK_RANGE)) {
+              applyIncomingDamage(p.atk.dmg, 'attack', {
+                stunMs: p.atk.stunMs || 0,
+                burstColor: 0xff6f4d
+              });
             }
           }
           // Enemy HP
           r.hp = p.hp ?? r.hp;
           r.maxHP = p.maxHP ?? r.maxHP;
           r.invisUntil = p.invisUntil || 0;
+          r.shieldUntil = p.shieldUntil || 0;
+          r.stunUntil = p.stunUntil || 0;
           if (r.hp <= 0 && !deathSequenceStarted) {
             deathSequenceStarted = true;
             triggerRobotDeath(r.group, true);
@@ -1804,17 +1947,19 @@
   function publishImmediate(extra = {}) {
     if (!roomId) return;
     const now = Date.now();
+    trimLocalHazards(now);
     const payload = {
       x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
       wheels: PIECES.wheels.current, rims: PIECES.rims.current, chassis: PIECES.chassis.current,
       body: PIECES.body.current, front: PIECES.front.current, antenna: PIECES.antenna.current,
-      styles: pieceStyles, hp: myHP, maxHP: myMaxHP, invisUntil, ts: now, ...extra
+      styles: pieceStyles, hp: myHP, maxHP: myMaxHP, invisUntil, shieldUntil, stunUntil,
+      fronts: serializeLocalHazards(), ts: now, ...extra
     };
     db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
     lastPublish = now;
   }
 
-    function getEnemyRobot() {
+  function getEnemyRobot() {
       return Object.values(remoteRobots)[0] || null;
     }
 
@@ -1822,6 +1967,7 @@
       if (antennaKey === 'boost') return 'BOOST PRET';
       if (antennaKey === 'teleport') return 'TELEPORT PRET';
       if (antennaKey === 'stealth') return 'INVISIBLE PRET';
+      if (antennaKey === 'shield') return 'BOUCLIER PRET';
       return 'SPECIAL PRET';
     }
 
@@ -1858,6 +2004,183 @@
         specialReadyPending = false;
       }
     }
+
+  function applyStun(ms) {
+    if (!ms || ms <= 0 || gameOver) return;
+    stunUntil = Math.max(stunUntil, Date.now() + ms);
+  }
+
+  function applyIncomingDamage(amount, source, opts = {}) {
+    if (gameOver || deathSequenceStarted) return;
+    const now = Date.now();
+    const shieldActive = now < shieldUntil;
+    let dmg = Math.max(0, Math.round(amount || 0));
+    let stunMs = opts.stunMs || 0;
+    if (shieldActive) {
+      dmg = Math.round(dmg * 0.35);
+      stunMs = 0;
+    }
+    if (dmg > 0) {
+      myHP = Math.max(0, myHP - dmg);
+      updateHPBars();
+    }
+    if (stunMs > 0) applyStun(stunMs);
+    if (opts.burstColor) {
+      spawnExplosionBurst(new THREE.Vector3(robotPos.x, 0, robotPos.z), opts.burstColor);
+    }
+    if (myHP <= 0 && !deathSequenceStarted) {
+      deathSequenceStarted = true;
+      triggerRobotDeath(robotGroup, false);
+    }
+  }
+
+  function deployFrontHazard(frontOpt, now) {
+    trimLocalHazards(now);
+    const deployDist = frontOpt.mode === 'deployMine' ? 0.78 : 0.88;
+    const hazard = {
+      id: `${now}-${Math.floor(Math.random() * 1e6)}`,
+      type: frontOpt.mode,
+      x: THREE.MathUtils.clamp(robotPos.x + Math.sin(robotPos.ry) * deployDist, -ARENA + 0.45, ARENA - 0.45),
+      z: THREE.MathUtils.clamp(robotPos.z + Math.cos(robotPos.ry) * deployDist, -ARENA + 0.45, ARENA - 0.45),
+      armedAt: now + (frontOpt.armDelayMs || 500),
+      expiresAt: now + (frontOpt.hazardLifeMs || 12000),
+      damage: frontOpt.hazardDamage || 12,
+      stunMs: frontOpt.stunMs || 0,
+      radius: frontOpt.hazardRadius || 0.4
+    };
+    localHazards.push(hazard);
+    const limit = frontOpt.deployLimit || 2;
+    const sameType = localHazards.filter(h => h.type === frontOpt.mode).sort((a, b) => a.armedAt - b.armedAt);
+    while (sameType.length > limit) {
+      const oldest = sameType.shift();
+      localHazards = localHazards.filter(h => h.id !== oldest.id);
+    }
+  }
+
+  function ensureShieldVisual(group) {
+    if (!group) return null;
+    let bubble = group.getObjectByName('shield-bubble');
+    if (bubble) return bubble;
+    bubble = new THREE.Mesh(
+      new THREE.SphereGeometry(0.48, 24, 18),
+      new THREE.MeshStandardMaterial({
+        color: 0x8fd6ff,
+        emissive: 0x36b6ff,
+        emissiveIntensity: 0.55,
+        metalness: 0.08,
+        roughness: 0.16,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide
+      })
+    );
+    bubble.name = 'shield-bubble';
+    bubble.position.y = 0.18;
+    bubble.visible = false;
+    group.add(bubble);
+    return bubble;
+  }
+
+  function syncShieldVisual(group, active, now) {
+    const bubble = ensureShieldVisual(group);
+    if (!bubble) return;
+    bubble.visible = !!active;
+    if (!active) return;
+    const pulse = 1 + Math.sin(now * 0.012) * 0.05;
+    bubble.scale.setScalar(pulse);
+    bubble.material.opacity = 0.18 + (Math.sin(now * 0.016) * 0.04 + 0.04);
+    bubble.rotation.y += 0.01;
+  }
+
+  function createHazardMesh(hazard, enemyOwned) {
+    const isMine = hazard.type === 'deployMine';
+    const mesh = new THREE.Group();
+    mesh.name = `hazard-${hazard.id}`;
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: isMine ? (enemyOwned ? 0xff925a : 0xffb36c) : (enemyOwned ? 0x58c5ff : 0x8fe6ff),
+      emissive: isMine ? 0xa33c14 : 0x1f7fc8,
+      emissiveIntensity: 0.45,
+      metalness: 0.45,
+      roughness: 0.35
+    });
+    const base = new THREE.Mesh(
+      isMine ? new THREE.CylinderGeometry(0.12, 0.14, 0.06, 18) : new THREE.CylinderGeometry(0.17, 0.17, 0.035, 6),
+      baseMat
+    );
+    base.position.y = 0.03;
+    mesh.add(base);
+    if (isMine) {
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), MAT.orange.clone());
+      core.position.y = 0.075;
+      mesh.add(core);
+    } else {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 6), MAT.accent.clone());
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.055;
+      mesh.add(ring);
+      const prism = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), MAT.orange.clone());
+      prism.position.y = 0.085;
+      mesh.add(prism);
+    }
+    return mesh;
+  }
+
+  function syncHazardVisuals(now) {
+    if (!hazardLayer) return;
+    trimLocalHazards(now);
+    cleanupConsumedRemoteHazards(now);
+    const desired = new Map();
+    serializeLocalHazards().forEach(h => desired.set(`self:${h.id}`, { hazard: h, enemyOwned: false }));
+    Object.values(remoteRobots).forEach(r => {
+      (r.fronts || []).forEach(h => {
+        const key = `${r.id}:${h.id}`;
+        if (consumedRemoteHazards.has(key)) return;
+        if (now >= (h.expiresAt || 0)) return;
+        desired.set(key, { hazard: h, enemyOwned: true });
+      });
+    });
+
+    hazardLayer.children.slice().forEach(child => {
+      if (!desired.has(child.userData.key)) hazardLayer.remove(child);
+    });
+
+    desired.forEach((entry, key) => {
+      let mesh = hazardLayer.children.find(c => c.userData.key === key);
+      if (!mesh) {
+        mesh = createHazardMesh(entry.hazard, entry.enemyOwned);
+        mesh.userData.key = key;
+        hazardLayer.add(mesh);
+      }
+      mesh.position.set(entry.hazard.x, 0, entry.hazard.z);
+      const armed = now >= entry.hazard.armedAt;
+      mesh.children.forEach((child, i) => {
+        if (!child.material) return;
+        if ('opacity' in child.material) child.material.opacity = armed ? 1 : 0.45;
+        if ('emissiveIntensity' in child.material) {
+          child.material.emissiveIntensity = armed ? 0.45 + Math.sin(now * 0.015 + i) * 0.1 : 0.2;
+        }
+      });
+      mesh.rotation.y += entry.hazard.type === 'deployMine' ? 0.018 : 0.012;
+    });
+  }
+
+  function processRemoteHazards(now) {
+    Object.values(remoteRobots).forEach(r => {
+      (r.fronts || []).forEach(h => {
+        const key = `${r.id}:${h.id}`;
+        if (consumedRemoteHazards.has(key) || now < h.armedAt || now >= h.expiresAt) return;
+        const dx = robotPos.x - h.x;
+        const dz = robotPos.z - h.z;
+        if (Math.sqrt(dx * dx + dz * dz) <= (h.radius || 0.42)) {
+          consumedRemoteHazards.set(key, h.expiresAt);
+          applyIncomingDamage(h.damage, 'hazard', {
+            stunMs: h.stunMs || 0,
+            burstColor: h.type === 'deployMine' ? 0xff925a : 0x6ec9ff
+          });
+        }
+      });
+    });
+  }
 
   function resolveTeleportTarget(enemy, desiredDist) {
     const margin = 0.38;
@@ -2010,16 +2333,21 @@
     // Animation
     const fg = robotGroup?.getObjectByName('front');
     if (fg) attackAnim = { group: fg, origZ: fg.position.z, phase: 'out', t0: now };
-    // Force-publish attack immediately
-    lastAttackPublished = { t: now, dmg };
-    const payload = {
-      x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
-      wheels: PIECES.wheels.current, rims: PIECES.rims.current, chassis: PIECES.chassis.current,
-      body: PIECES.body.current, front: PIECES.front.current, antenna: PIECES.antenna.current, styles: pieceStyles,
-      hp: myHP, maxHP: myMaxHP, atk: { t: now, dmg }, ts: now
-    };
-    if (roomId) db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
-    lastPublish = now;
+    if (frontOpt.mode === 'deployMine' || frontOpt.mode === 'deployTrap') {
+      deployFrontHazard(frontOpt, now);
+      publishImmediate();
+    } else {
+      lastAttackPublished = { t: now, dmg, stunMs: frontOpt.stunMs || 0, range: frontOpt.attackRange || ATTACK_RANGE };
+      const payload = {
+        x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
+        wheels: PIECES.wheels.current, rims: PIECES.rims.current, chassis: PIECES.chassis.current,
+        body: PIECES.body.current, front: PIECES.front.current, antenna: PIECES.antenna.current, styles: pieceStyles,
+        hp: myHP, maxHP: myMaxHP, invisUntil, shieldUntil, stunUntil, fronts: serializeLocalHazards(),
+        atk: { t: now, dmg, stunMs: frontOpt.stunMs || 0, range: frontOpt.attackRange || ATTACK_RANGE }, ts: now
+      };
+      if (roomId) db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
+      lastPublish = now;
+    }
     // Cooldown visual
     const ab = $('btn-attack');
     ab.classList.remove('ready'); ab.classList.add('cooling');
@@ -2060,6 +2388,10 @@
       triggered = true;
       invisUntil = now + 2000;
       publishImmediate();
+    } else if (PIECES.antenna.current === 'shield') {
+      triggered = true;
+      shieldUntil = now + 3000;
+      publishImmediate();
     }
       if (!triggered) return;
       specialCooldown = now + antenna.cooldownMs;
@@ -2099,6 +2431,9 @@
     // Sol et arène (construits par buildArena)
 
     buildArena();
+    hazardLayer = new THREE.Group();
+    hazardLayer.name = 'hazard-layer';
+    scene.add(hazardLayer);
     buildRobot();
     window.addEventListener('resize', onResize);
   }
@@ -2225,9 +2560,14 @@
     const now = Date.now();
     updateExplosionBursts(nowPerf);
     updateSpecialButton();
+    trimLocalHazards(now);
+    cleanupConsumedRemoteHazards(now);
 
     // Déplacement + orientation robot
     if(robotPlaced){
+      const prevX = robotPos.x;
+      const prevZ = robotPos.z;
+      const isStunned = now < stunUntil;
       if (specialFx?.type === 'boost') {
         const t = Math.min(1, (now - specialFx.t0) / specialFx.dur);
         const ease = 1 - Math.pow(1 - t, 3);
@@ -2246,7 +2586,7 @@
         * PIECES.chassis.options[PIECES.chassis.current].speed
         * PIECES.body.options[PIECES.body.current].speed;
 
-      if (!specialFx && landscapeMode && jLen > 0.05) {
+      if (!specialFx && !isStunned && landscapeMode && jLen > 0.05) {
         // Mode paysage : même logique qu'en portrait, axes pivotés 90°
         // le haut (move.z négatif) devient la gauche, la droite devient l'avant
         const lx = move.z;   // portrait haut/bas  → paysage gauche/droite
@@ -2258,10 +2598,10 @@
         const targetRy = Math.atan2(wx, wz);
         const da = Math.atan2(Math.sin(targetRy - robotPos.ry), Math.cos(targetRy - robotPos.ry));
         robotPos.ry += da * ROT_SMOOTH;
-      } else if (!specialFx && move.rotY !== 0) {
+      } else if (!specialFx && !isStunned && move.rotY !== 0) {
         // Boutons ROT : rotation manuelle sans déplacement
         robotPos.ry += move.rotY * ROT_SPEED;
-      } else if (!specialFx && jLen > 0.05) {
+      } else if (!specialFx && !isStunned && jLen > 0.05) {
         // Joystick : direction relative à la caméra (yaw uniquement)
         const wx = Math.cos(camYaw)*move.x + Math.sin(camYaw)*move.z;
         const wz = -Math.sin(camYaw)*move.x + Math.cos(camYaw)*move.z;
@@ -2285,6 +2625,9 @@
       const limit = ARENA - 0.32;
       robotPos.x = THREE.MathUtils.clamp(robotPos.x, -limit, limit);
       robotPos.z = THREE.MathUtils.clamp(robotPos.z, -limit, limit);
+      const motionX = robotPos.x - prevX;
+      const motionZ = robotPos.z - prevZ;
+      const localProfile = getCombatProfile();
 
       // Collision robot-robot : impulsion + saut
       const COLL_D = ROBOT_RADIUS * 2;
@@ -2294,17 +2637,31 @@
         const dist = Math.sqrt(dx * dx + dz * dz);
         if (dist < COLL_D && dist > 0.001) {
           const nx = dx / dist, nz = dz / dist;
+          const enemyProfile = getCombatProfile(r);
+          const localPush = PUSH_STRENGTH * THREE.MathUtils.clamp(enemyProfile.mass / localProfile.mass, 0.82, 1.55);
+          const remotePush = 0.30 * THREE.MathUtils.clamp(localProfile.mass / enemyProfile.mass, 0.75, 1.4);
           // Impulsion sur le robot local (direction de séparation)
-          pushVelX = nx * PUSH_STRENGTH;
-          pushVelZ = nz * PUSH_STRENGTH;
+          pushVelX = nx * localPush;
+          pushVelZ = nz * localPush;
           // Saut local (seulement si au sol)
           if (jumpY <= 0.001 && jumpVel <= 0) jumpVel = JUMP_INIT_VEL;
           // Pop visuel sur le robot distant + son saut
-          r.pushOffX = -nx * 0.30;
-          r.pushOffZ = -nz * 0.30;
+          r.pushOffX = -nx * remotePush;
+          r.pushOffZ = -nz * remotePush;
           if (r.jumpY <= 0.001 && r.jumpVel <= 0) r.jumpVel = JUMP_INIT_VEL;
+          const relSpeed = Math.hypot(motionX - (r.frameVx || 0), motionZ - (r.frameVz || 0));
+          if (now - (r.lastCollisionAt || 0) > 700) {
+            const impactPower = relSpeed * enemyProfile.mass * enemyProfile.collisionBias * 44;
+            if (impactPower > 3.6) {
+              const dmg = Math.round(Math.min(18, Math.max(4, (impactPower - 3.6) * 2.05)));
+              const stunMs = impactPower > 8.8 ? Math.min(720, Math.round((impactPower - 8.8) * 52)) : 0;
+              applyIncomingDamage(dmg, 'collision', { stunMs, burstColor: 0xffb36c });
+              r.lastCollisionAt = now;
+            }
+          }
         }
       });
+      processRemoteHazards(now);
 
       // Physique de saut local
       if (jumpVel > 0 || jumpY > 0) {
@@ -2331,7 +2688,10 @@
       robotGroup.position.y = jumpY;
       robotGroup.position.z = robotPos.z;
       robotGroup.rotation.y = robotPos.ry;
+      robotGroup.rotation.z = now < stunUntil ? Math.sin(now * 0.04) * 0.08 : 0;
       robotGroup.visible = now >= invisUntil;
+      localVelX = robotPos.x - prevX;
+      localVelZ = robotPos.z - prevZ;
 
       // Animer les roues
       const spd = Math.sqrt(move.x*move.x + move.z*move.z);
@@ -2353,6 +2713,9 @@
         } else if (PIECES.antenna.current === 'stealth') {
           antennaGroup.position.x = 0;
           antennaGroup.position.y = Math.sin(now * 0.004) * 0.03;
+        } else if (PIECES.antenna.current === 'shield') {
+          antennaGroup.position.set(0, 0, 0);
+          antennaGroup.rotation.y += 0.04;
         } else {
           antennaGroup.position.set(0, 0, 0);
         }
@@ -2363,6 +2726,7 @@
             : 0.18;
         });
       }
+      syncShieldVisual(robotGroup, now < shieldUntil, now);
 
       $('stat-x').textContent=robotPos.x.toFixed(2);
       $('stat-z').textContent=robotPos.z.toFixed(2);
@@ -2379,6 +2743,8 @@
     // Publier position + interpoler robots distants
     if (robotPlaced) publishPosition();
     Object.values(remoteRobots).forEach(r => {
+      const prevWorldX = r.worldX ?? r.group.position.x;
+      const prevWorldZ = r.worldZ ?? r.group.position.z;
       r.lerpX += (r.targetX - r.lerpX) * 0.25;
       r.lerpZ += (r.targetZ - r.lerpZ) * 0.25;
       const dRy = Math.atan2(Math.sin(r.targetRy - r.group.rotation.y), Math.cos(r.targetRy - r.group.rotation.y));
@@ -2391,15 +2757,23 @@
         r.jumpY = Math.max(0, r.jumpY + r.jumpVel);
         if (r.jumpY <= 0) { r.jumpY = 0; r.jumpVel = 0; }
       }
-      r.group.position.set(r.lerpX + r.pushOffX, r.jumpY, r.lerpZ + r.pushOffZ);
+      r.worldX = r.lerpX + r.pushOffX;
+      r.worldZ = r.lerpZ + r.pushOffZ;
+      r.frameVx = r.worldX - prevWorldX;
+      r.frameVz = r.worldZ - prevWorldZ;
+      r.group.position.set(r.worldX, r.jumpY, r.worldZ);
+      r.group.rotation.z = now < (r.stunUntil || 0) ? Math.sin(now * 0.04 + r.worldX) * 0.08 : 0;
       r.group.visible = now >= (r.invisUntil || 0);
       const antennaGroup = r.group.getObjectByName('antenna');
       if (antennaGroup) {
         if (r.antenna === 'teleport') antennaGroup.position.x = Math.sin(now * 0.003) * 0.085;
         else if (r.antenna === 'stealth') antennaGroup.position.y = Math.sin(now * 0.004) * 0.03;
+        else if (r.antenna === 'shield') { antennaGroup.position.set(0, 0, 0); antennaGroup.rotation.y += 0.04; }
         else antennaGroup.position.set(0, 0, 0);
       }
+      syncShieldVisual(r.group, now < (r.shieldUntil || 0), now);
     });
+    syncHazardVisuals(now);
 
     renderer.render(scene, camera);
   }
