@@ -429,12 +429,14 @@
 
   let myHP = 100, myMaxHP = 100;
   let gameOver = false;
+  let deathSequenceStarted = false;
   let isCreator = false;
   let camSide = 1;
   let landscapeMode = false;
   let attackCooldown = 0;      // timestamp (ms) when cooldown expires
   let attackAnim = null;        // { group, origZ, phase, t0 }
   let lastAttackPublished = null; // { t, dmg } pending publish
+  const fxBursts = [];
   const ATTACK_RANGE = 1.5;
   const BASE_ATTACK_DMG = 20;
   let selectedArenaStyle = 'neon-grid';
@@ -1633,13 +1635,19 @@
             if (Math.sqrt(dx*dx + dz*dz) < ATTACK_RANGE) {
               myHP = Math.max(0, myHP - p.atk.dmg);
               updateHPBars();
-              if (myHP <= 0) endGame(false);
+              if (myHP <= 0 && !deathSequenceStarted) {
+                deathSequenceStarted = true;
+                triggerRobotDeath(robotGroup, false);
+              }
             }
           }
           // Enemy HP
           r.hp = p.hp ?? r.hp;
           r.maxHP = p.maxHP ?? r.maxHP;
-          if (r.hp <= 0 && !gameOver) endGame(true);
+          if (r.hp <= 0 && !deathSequenceStarted) {
+            deathSequenceStarted = true;
+            triggerRobotDeath(r.group, true);
+          }
           updateHPBars();
         }
       });
@@ -1674,6 +1682,111 @@
       }
       $('hp-label-enemy').textContent = enemy.hp + '/' + enemy.maxHP;
     }
+  }
+
+  function spawnExplosionBurst(origin, tint = 0xff7b2f) {
+    const burst = new THREE.Group();
+    burst.position.copy(origin);
+    scene.add(burst);
+    const startedAt = performance.now();
+    const sparks = [];
+    const smoke = [];
+
+    for (let i = 0; i < 10; i++) {
+      const spark = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.05, 0.05),
+        new THREE.MeshStandardMaterial({
+          color: tint,
+          emissive: tint,
+          emissiveIntensity: 0.8,
+          metalness: 0.25,
+          roughness: 0.3
+        })
+      );
+      spark.position.set(0, 0.16, 0);
+      spark.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      burst.add(spark);
+      sparks.push({
+        mesh: spark,
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.11,
+          0.05 + Math.random() * 0.06,
+          (Math.random() - 0.5) * 0.11
+        ),
+        spin: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.28,
+          (Math.random() - 0.5) * 0.28,
+          (Math.random() - 0.5) * 0.28
+        )
+      });
+    }
+
+    for (let i = 0; i < 7; i++) {
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11 + Math.random() * 0.05, 10, 10),
+        new THREE.MeshStandardMaterial({
+          color: 0x5e6670,
+          transparent: true,
+          opacity: 0.75,
+          roughness: 1,
+          metalness: 0
+        })
+      );
+      puff.position.set((Math.random() - 0.5) * 0.12, 0.14 + Math.random() * 0.1, (Math.random() - 0.5) * 0.12);
+      puff.scale.setScalar(0.55 + Math.random() * 0.45);
+      burst.add(puff);
+      smoke.push({
+        mesh: puff,
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.015,
+          0.012 + Math.random() * 0.012,
+          (Math.random() - 0.5) * 0.015
+        ),
+        grow: 0.012 + Math.random() * 0.018
+      });
+    }
+
+    fxBursts.push({ burst, sparks, smoke, startedAt, duration: 1600 });
+  }
+
+  function updateExplosionBursts(now) {
+    for (let i = fxBursts.length - 1; i >= 0; i--) {
+      const fx = fxBursts[i];
+      const t = (now - fx.startedAt) / fx.duration;
+      if (t >= 1) {
+        scene.remove(fx.burst);
+        fxBursts.splice(i, 1);
+        continue;
+      }
+      fx.sparks.forEach(s => {
+        s.mesh.position.add(s.velocity);
+        s.velocity.y -= 0.003;
+        s.velocity.multiplyScalar(0.985);
+        s.mesh.rotation.x += s.spin.x;
+        s.mesh.rotation.y += s.spin.y;
+        s.mesh.rotation.z += s.spin.z;
+        s.mesh.material.opacity = 1 - t;
+        s.mesh.material.transparent = true;
+        s.mesh.scale.multiplyScalar(0.992);
+      });
+      fx.smoke.forEach(s => {
+        s.mesh.position.add(s.velocity);
+        s.mesh.scale.multiplyScalar(1 + s.grow);
+        s.mesh.material.opacity = Math.max(0, 0.72 * (1 - t));
+      });
+    }
+  }
+
+  function triggerRobotDeath(group, won) {
+    if (!group) {
+      endGame(won);
+      return;
+    }
+    const pos = new THREE.Vector3();
+    group.getWorldPosition(pos);
+    spawnExplosionBurst(pos, won ? 0x00f5ff : 0xff5533);
+    group.visible = false;
+    setTimeout(() => endGame(won), 3000);
   }
 
   function endGame(won) {
@@ -1875,6 +1988,7 @@
 
   function onFrame(time, frame) {
     clock.getDelta();
+    updateExplosionBursts(performance.now());
 
     // Déplacement + orientation robot
     if(robotPlaced){
