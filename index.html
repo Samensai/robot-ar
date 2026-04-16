@@ -268,10 +268,10 @@
       bottom:24px; top:auto; right:16px; left:auto; transform:none;
       flex-direction:column; gap:8px; align-items:flex-end; }
     body.ls .ctrl-btn {
-      writing-mode:vertical-rl; transform:rotate(180deg); }
+      writing-mode:vertical-rl; transform:none; }
     /* Bouton portrait/paysage → haut-droit, pivoté 90° */
     body.ls #btn-landscape {
-      top:56px; right:16px; left:auto; transform:rotate(180deg);
+      top:56px; right:16px; left:auto; transform:none;
       writing-mode:vertical-rl; }
   </style>
 </head>
@@ -1430,7 +1430,7 @@
     CAM_FIXED.z = 3.6 * camSide;
     robotPos.x = 0;
     robotPos.z = 2.5 * camSide;
-    robotPos.ry = Math.PI;
+    robotPos.ry = isCreator ? Math.PI : 0;
     camYaw = isCreator ? 0 : Math.PI;
     myMaxHP = calcMaxHP();
     myHP = myMaxHP;
