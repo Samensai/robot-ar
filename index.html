@@ -38,7 +38,6 @@
       color:var(--cyan); display:flex; align-items:center; gap:6px; }
     #status-dot { width:6px; height:6px; border-radius:50%; background:#aaa; transition:background .3s; }
     #status-dot.active { background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
-    #status-dot.ar { background:#00ff88; box-shadow:0 0 6px #00ff88; }
     /* Stats */
     #stats-hud { position:fixed; top:60px; right:16px; z-index:20;
       font-family:var(--font-mono); font-size:10px; color:rgba(0,245,255,0.6);
@@ -66,66 +65,6 @@
       border-radius:4px; padding:9px 14px; cursor:pointer; backdrop-filter:blur(8px);
       transition:background .15s,border-color .15s; -webkit-user-select:none; user-select:none; }
     .ctrl-btn:active,.ctrl-btn.active { background:rgba(0,245,255,0.15); border-color:rgba(0,245,255,0.6); }
-    /* AR hint */
-    #ar-hint { position:fixed; bottom:200px; left:50%; transform:translateX(-50%);
-      z-index:20; font-family:var(--font-mono); font-size:12px; color:rgba(0,245,255,0.7);
-      letter-spacing:.1em; text-align:center; pointer-events:none;
-      transition:opacity .5s; text-shadow:0 0 8px var(--cyan); }
-    #ar-hint.hidden { opacity:0; }
-    #reticle-hint { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      z-index:15; pointer-events:none; transition:opacity .3s; }
-    #reticle-hint.hidden { opacity:0; }
-    .reticle-ring { width:48px; height:48px; border:1.5px solid rgba(0,245,255,0.6);
-      border-radius:50%; position:relative; animation:pulse-ring 2s ease-in-out infinite; }
-    @keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:.6} 50%{transform:scale(1.15);opacity:1} }
-    .reticle-cross::before,.reticle-cross::after { content:''; position:absolute;
-      background:rgba(0,245,255,0.6); top:50%; left:50%; }
-    .reticle-cross::before { width:1px; height:20px; transform:translate(-50%,-50%); }
-    .reticle-cross::after { width:20px; height:1px; transform:translate(-50%,-50%); }
-    #btn-place { position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-      z-index:30; font-family:var(--font-mono); font-size:12px; letter-spacing:.12em;
-      color:var(--dark); background:var(--cyan); border:none; padding:12px 32px;
-      border-radius:2px; cursor:pointer; box-shadow:0 0 16px rgba(0,245,255,0.4);
-      transition:opacity .3s,visibility .3s; }
-    #btn-place.hidden { opacity:0; visibility:hidden; }
-    /* AR Quick Look — dans le menu splash */
-    #ar-quicklook-btn { display:none; width:100%; margin-top:10px;
-      font-family:var(--font-mono); font-size:13px; letter-spacing:.1em;
-      color:var(--orange); background:none;
-      border:1.5px solid rgba(255,107,43,0.3);
-      padding:12px 0; border-radius:2px; cursor:pointer;
-      text-align:center; text-decoration:none; }
-
-    /* ═══════════════════════════════════════════
-       PIECE SELECTION MENU
-    ═══════════════════════════════════════════ */
-    #piece-menu { position:fixed; z-index:40; display:none;
-      flex-direction:column; gap:8px; }
-    #piece-menu.visible { display:flex; }
-    #piece-menu-title { font-family:var(--font-mono); font-size:10px;
-      color:rgba(0,245,255,0.5); letter-spacing:.15em; margin-bottom:4px; }
-    .piece-card { background:var(--panel); border:1.5px solid rgba(0,245,255,0.3);
-      border-radius:6px; padding:10px 14px; cursor:pointer; backdrop-filter:blur(12px);
-      display:flex; align-items:center; gap:10px; transition:border-color .15s,background .15s;
-      min-width:180px; }
-    .piece-card:active,.piece-card.selected { border-color:var(--cyan);
-      background:rgba(0,245,255,0.12); }
-    .piece-card-icon { font-size:18px; flex-shrink:0; }
-    .piece-card-info { flex:1; }
-    .piece-card-name { font-family:var(--font-mono); font-size:12px; color:var(--cyan);
-      letter-spacing:.08em; }
-    .piece-card-stats { font-size:11px; color:rgba(200,230,255,0.5); margin-top:2px; }
-    #piece-menu-close { font-family:var(--font-mono); font-size:10px;
-      color:rgba(200,230,255,0.4); background:none; border:1px solid rgba(200,230,255,0.15);
-      border-radius:4px; padding:6px 12px; cursor:pointer; text-align:center; }
-
-    /* Hint tap */
-    #tap-hint { position:fixed; bottom:170px; left:50%; transform:translateX(-50%);
-      z-index:20; font-family:var(--font-mono); font-size:11px;
-      color:rgba(0,245,255,0.5); letter-spacing:.1em; pointer-events:none;
-      text-align:center; transition:opacity 1s; }
-    #tap-hint.hidden { opacity:0; }
-
     /* Splash */
     #splash { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column;
       align-items:center; justify-content:center; background:var(--dark);
@@ -384,21 +323,6 @@
     <div><span class="stat-label">ONLINE</span><span id="stat-players">—</span></div>
   </div>
 
-  <div id="reticle-hint" class="hidden">
-    <div class="reticle-ring"><div class="reticle-cross"></div></div>
-  </div>
-  <div id="ar-hint" class="hidden">POINTER VERS UNE SURFACE PLANE</div>
-  <button id="btn-place" class="hidden">[ PLACER LE ROBOT ]</button>
-
-  <div id="tap-hint">TAP SUR UNE PIÈCE POUR LA MODIFIER</div>
-
-  <!-- Piece selection menu -->
-  <div id="piece-menu">
-    <div id="piece-menu-title">CHOISIR UNE PIÈCE</div>
-    <div id="piece-menu-cards"></div>
-    <button id="piece-menu-close">✕ ANNULER</button>
-  </div>
-
   <div id="joystick-zone">
     <div id="joystick-base"><div id="joystick-thumb"></div></div>
   </div>
@@ -431,8 +355,6 @@
       <button class="btn-splash-sec" id="btn-customize" style="margin-bottom:14px;">✦ PERSONNALISER →</button>
       <button class="btn-splash-primary" id="btn-create">[ CRÉER UNE PARTIE ]</button>
       <button class="btn-splash-sec" id="btn-show-join">Rejoindre une partie →</button>
-      <button class="btn-splash-sec" id="btn-export-glb-menu" style="font-size:12px;margin-top:10px;">⬇ Exporter le robot GLB</button>
-      <a id="ar-quicklook-btn" rel="ar" href="robot.usdz">📱 Voir en AR</a>
     </div>
 
     <!-- Vue personnalisation plein écran -->
@@ -615,7 +537,6 @@
   let robotGroup;
   let mode = 'loading';
   let robotPlaced = false;
-  let xrSession = null, xrHitTestSource = null, reticleGroup = null;
   const move = { x:0, z:0, rotY:0 };
   const robotPos = { x:0, z:0, ry:0 };
   const SPEED = 0.04, ROT_SPEED = 0.04, ROT_SMOOTH = 0.18;
@@ -1045,137 +966,6 @@
     }
     requestAnimationFrame(tick);
   }
-
-  // ═══════════════════════════════════════════════
-  //  SÉLECTION DE PIÈCES (RAYCASTING + TAP)
-  // ═══════════════════════════════════════════════
-
-  let selectedPieceType = null;
-  let originalMaterials = new Map(); // mesh → original material
-  const raycaster = new THREE.Raycaster();
-  const tapPoint = new THREE.Vector2();
-
-  function highlightPiece(pieceType) {
-    // Restaurer les matériaux précédents
-    clearHighlight();
-    selectedPieceType = pieceType;
-
-    robotGroup.traverse(obj => {
-      if (obj.isMesh && obj.userData.pieceType === pieceType) {
-        originalMaterials.set(obj, obj.material);
-        obj.material = MAT.highlight;
-      }
-    });
-  }
-
-  function clearHighlight() {
-    originalMaterials.forEach((mat, mesh) => { mesh.material = mat; });
-    originalMaterials.clear();
-    selectedPieceType = null;
-  }
-
-  function onTap(clientX, clientY) {
-    if (!robotPlaced) return;
-    if (roomId) return; // pièces verrouillées pendant une partie
-
-    // Calculer la position normalisée
-    tapPoint.x = (clientX / window.innerWidth)  * 2 - 1;
-    tapPoint.y = -(clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(tapPoint, camera);
-
-    const hits = raycaster.intersectObject(robotGroup, true);
-    if (hits.length === 0) {
-      // Tap dans le vide : fermer le menu
-      closePieceMenu();
-      clearHighlight();
-      return;
-    }
-
-    const hit = hits[0].object;
-    const pieceType = hit.userData.pieceType;
-
-    if (!pieceType) { closePieceMenu(); clearHighlight(); return; }
-
-    if (selectedPieceType === pieceType) {
-      // Deuxième tap sur la même pièce → ouvrir le menu
-      openPieceMenu(pieceType, clientX, clientY);
-    } else {
-      // Premier tap → surbrillance
-      closePieceMenu();
-      highlightPiece(pieceType);
-      $('tap-hint').textContent = 'RE-TAP POUR CHANGER LA PIÈCE';
-      $('tap-hint').classList.remove('hidden');
-    }
-  }
-
-  function openPieceMenu(pieceType, cx, cy) {
-    const menu = $('piece-menu');
-    const cards = $('piece-menu-cards');
-    const title = $('piece-menu-title');
-
-    // Mettre les matériaux en "sélectionné" (orange)
-    robotGroup.traverse(obj => {
-      if (obj.isMesh && obj.userData.pieceType === pieceType) {
-        obj.material = MAT.selected;
-      }
-    });
-
-    title.textContent = '— ' + PIECES[pieceType].label + ' —';
-    cards.innerHTML = '';
-
-    const options = PIECES[pieceType].options;
-    Object.entries(options).forEach(([key, opt]) => {
-      const card = document.createElement('div');
-      card.className = 'piece-card' + (PIECES[pieceType].current === key ? ' selected' : '');
-      card.innerHTML = `
-        <div class="piece-card-icon">${opt.icon}</div>
-        <div class="piece-card-info">
-          <div class="piece-card-name">${opt.name}</div>
-          <div class="piece-card-stats">${opt.stats}</div>
-        </div>
-        ${PIECES[pieceType].current === key ? '<div style="color:var(--cyan);font-size:10px;font-family:var(--font-mono);">✓</div>' : ''}
-      `;
-      card.addEventListener('click', () => {
-        swapPiece(pieceType, key);
-        closePieceMenu();
-        clearHighlight();
-        $('tap-hint').textContent = 'TAP SUR UNE PIÈCE POUR LA MODIFIER';
-      });
-      cards.appendChild(card);
-    });
-
-    // Positionner le menu près du tap mais dans l'écran
-    menu.classList.add('visible');
-    const mw = 210, mh = 160;
-    let mx = Math.min(cx + 16, window.innerWidth - mw - 16);
-    let my = Math.min(cy - 20, window.innerHeight - mh - 80);
-    my = Math.max(my, 80);
-    menu.style.left = mx + 'px';
-    menu.style.top  = my + 'px';
-  }
-
-  function closePieceMenu() {
-    $('piece-menu').classList.remove('visible');
-  }
-
-  $('piece-menu-close').addEventListener('click', () => {
-    closePieceMenu();
-    clearHighlight();
-    $('tap-hint').textContent = 'TAP SUR UNE PIÈCE POUR LA MODIFIER';
-  });
-
-  // Tap events
-  $('main-canvas').addEventListener('click', e => {
-    // Ignorer si un joystick ou bouton est actif
-    if (jActive) return;
-    onTap(e.clientX, e.clientY);
-  });
-
-  $('main-canvas').addEventListener('touchend', e => {
-    if (jActive) return;
-    const t = e.changedTouches[0];
-    onTap(t.clientX, t.clientY);
-  }, { passive: true });
 
   // ═══════════════════════════════════════════════
   //  ARÈNE
@@ -1661,7 +1451,6 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.xr.enabled = true;
 
     // Lumières
     scene.add(new THREE.AmbientLight(0x8888bb, 0.8));
@@ -1678,60 +1467,6 @@
     buildRobot();
     window.addEventListener('resize', onResize);
   }
-
-  // ═══════════════════════════════════════════════
-  //  AR RETICLE + SESSION
-  // ═══════════════════════════════════════════════
-
-  function buildReticle() {
-    reticleGroup = new THREE.Group();
-    const geo = new THREE.RingGeometry(0.1,0.12,32);
-    const reticleMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0x00f5ff,side:THREE.DoubleSide}));
-    reticleMesh.rotation.x = -Math.PI/2;
-    reticleGroup.add(reticleMesh);
-    reticleGroup.visible = false;
-    scene.add(reticleGroup);
-  }
-
-  async function startAR() {
-    if (!navigator.xr) return false;
-    const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
-    if (!supported) return false;
-    try {
-      xrSession = await navigator.xr.requestSession('immersive-ar',{
-        requiredFeatures:['hit-test'],
-        optionalFeatures:['dom-overlay'],
-        domOverlay:{root:document.body}
-      });
-      renderer.xr.setReferenceSpaceType('local');
-      await renderer.xr.setSession(xrSession);
-      const xrRefSpace = await xrSession.requestReferenceSpace('viewer');
-      xrHitTestSource = await xrSession.requestHitTestSource({space:xrRefSpace});
-      xrSession.addEventListener('end',()=>{ xrHitTestSource=null; xrSession=null; });
-      const _gridObj = scene.getObjectByName('grid'); if (_gridObj) _gridObj.visible = false;
-      const _groundObj = scene.getObjectByName('ground'); if (_groundObj) _groundObj.visible = false;
-      robotGroup.visible = false;
-      buildReticle();
-      $('reticle-hint').classList.remove('hidden');
-      $('ar-hint').classList.remove('hidden');
-      $('btn-place').classList.remove('hidden');
-      setStatus('AR ACTIF','ar');
-      mode = 'ar';
-      return true;
-    } catch(e) { console.warn('AR fail',e); return false; }
-  }
-
-  $('btn-place').addEventListener('click', () => {
-    if (reticleGroup?.visible) {
-      robotGroup.position.copy(reticleGroup.position);
-      robotGroup.visible = true;
-      robotPlaced = true;
-      $('btn-place').classList.add('hidden');
-      $('reticle-hint').classList.add('hidden');
-      $('ar-hint').classList.add('hidden');
-      setTimeout(()=>$('tap-hint').classList.remove('hidden'),1000);
-    }
-  });
 
   // ═══════════════════════════════════════════════
   //  GYRO ORBITAL (iPhone)
@@ -1828,21 +1563,15 @@
     $('hp-enemy-wrap').style.display = 'flex';
     $('hp-me-wrap').style.display = 'flex';
     updateHPBars();
-    dbgLog('startAR...');
-    const arOk = await startAR();
-    dbgLog('AR: ' + arOk);
-    if(!arOk){
-      mode='3d';
-      setStatus('MODE 3D','active');
-      robotPlaced=true;
-      scene.background=new THREE.Color(0x050810);
-      scene.fog=new THREE.FogExp2(0x050810,.08);
-      await requestGyro();
-      setTimeout(()=>$('tap-hint').classList.remove('hidden'),1500);
-    }
+    dbgLog('initGame...');
+    mode='3d';
+    setStatus('MODE 3D','active');
+    robotPlaced=true;
+    scene.background=new THREE.Color(0x050810);
+    scene.fog=new THREE.FogExp2(0x050810,.08);
+    await requestGyro();
     dbgLog('Loop démarrée ✓');
     renderer.setAnimationLoop(onFrame);
-    checkUSDZ();
     } catch(err) {
       dbgLog('ERREUR init: ' + err.message, '#ff4444');
       throw err;
@@ -1855,17 +1584,6 @@
 
   function onFrame(time, frame) {
     clock.getDelta();
-
-    // AR hit-test
-    if(mode==='ar'&&frame&&xrHitTestSource){
-      const hits=frame.getHitTestResults(xrHitTestSource);
-      if(hits.length){
-        const pose=hits[0].getPose(renderer.xr.getReferenceSpace());
-        reticleGroup.visible=true;
-        reticleGroup.matrix.fromArray(pose.transform.matrix);
-        reticleGroup.matrix.decompose(reticleGroup.position,reticleGroup.quaternion,reticleGroup.scale);
-      } else reticleGroup.visible=false;
-    }
 
     // Déplacement + orientation robot
     if(robotPlaced){
@@ -2007,7 +1725,6 @@
     $('status-text').textContent=label;
     $('status-dot').className='status-dot';
     if(state) $('status-dot').classList.add(state);
-    if(state==='ar') $('stat-mode').textContent='AR';
     if(state==='active') $('stat-mode').textContent='3D';
   }
 
@@ -2015,12 +1732,6 @@
     camera.aspect=window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth,window.innerHeight);
-  }
-
-  function checkUSDZ() {
-    fetch('/robot-ar/robot.usdz',{method:'HEAD'})
-      .then(r=>{ if(r.ok) $('ar-quicklook-btn').style.display='block'; })
-      .catch(()=>{});
   }
 
   // ═══════════════════════════════════════════════
@@ -2511,33 +2222,6 @@
     }
     renderColorSwatches();
   }
-
-  // ── GLB Export (depuis menu principal) ────────
-
-  function exportGLBFromMenu() {
-    initMaterials(); // peuple MAT si pas encore initialisé
-    function doExport() {
-      const tmpGroup = new THREE.Group();
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.18,.025,.01), MAT.accent.clone());
-      eye.position.set(0,0.14,0.19); tmpGroup.add(eye);
-      tmpGroup.add(PIECES.body.options[PIECES.body.current].build());
-      tmpGroup.add(PIECES.wheels.options[PIECES.wheels.current].build(WHEEL_POSITIONS));
-      tmpGroup.add(PIECES.front.options[PIECES.front.current].build());
-      new THREE.GLTFExporter().parse(tmpGroup, result => {
-        const a = Object.assign(document.createElement('a'), {
-          href: URL.createObjectURL(new Blob([result],{type:'application/octet-stream'})),
-          download: 'robot.glb'
-        });
-        a.click();
-      }, {binary:true});
-    }
-    if (THREE.GLTFExporter) { doExport(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js';
-    s.onload = doExport;
-    document.head.appendChild(s);
-  }
-  $('btn-export-glb-menu').addEventListener('click', exportGLBFromMenu);
 
   // ── Joystick ──────────────────────────────────
   const jBase=$('joystick-base'), jThumb=$('joystick-thumb');
