@@ -155,14 +155,20 @@
       border:1px solid rgba(0,245,255,0.18); border-radius:999px; padding:11px 16px;
       backdrop-filter:blur(10px);
     }
-    #cust-right-ui { width:min(300px, calc(100vw - 40px)); display:flex; flex-direction:column; gap:10px;
-      max-height:min(62vh, 520px); overflow:auto; padding-right:2px; }
+    #btn-cust-progress {
+      align-self:flex-start; margin:0; background:rgba(3,10,18,0.68);
+      border:1px solid rgba(255,190,90,0.18); border-radius:999px; padding:11px 16px;
+      backdrop-filter:blur(10px); color:#ffcf86; font-family:var(--font-mono); font-size:10px; letter-spacing:.12em;
+    }
+    #btn-cust-progress.active { background:rgba(255,190,90,0.12); border-color:rgba(255,190,90,0.45); }
+    #cust-right-ui { width:min(228px, calc(100vw - 40px)); display:flex; flex-direction:column; gap:10px; }
     #cust-stats { width:100%; display:flex; flex-direction:column; gap:7px;
       background:rgba(3,10,18,0.72); border:1px solid rgba(0,245,255,0.12); border-radius:18px;
       padding:14px 14px 12px; backdrop-filter:blur(12px); }
-    #cust-progression { width:100%; display:flex; flex-direction:column; gap:10px;
+    #cust-progression { position:absolute; right:16px; bottom:74px; z-index:3; width:min(300px, calc(100vw - 32px)); display:flex; flex-direction:column; gap:10px;
       background:rgba(3,10,18,0.72); border:1px solid rgba(255,190,90,0.16); border-radius:18px;
-      padding:14px; backdrop-filter:blur(12px); }
+      padding:14px; backdrop-filter:blur(12px); max-height:min(48vh, 360px); overflow:auto; }
+    #cust-progression.hidden { display:none; }
     .cust-panel-title { font-family:var(--font-mono); font-size:10px; letter-spacing:.16em; color:rgba(255,190,90,0.78); }
     .cust-meta-line { display:flex; align-items:center; justify-content:space-between; gap:10px;
       font-family:var(--font-mono); font-size:10px; color:rgba(220,240,255,0.7); }
@@ -216,11 +222,11 @@
     @media (max-width: 720px) {
       #cust-topbar { left:12px; right:12px; top:12px; }
       #btn-back-cust { align-self:flex-start; }
-      #cust-right-ui {
-        position:absolute; right:0; bottom:68px; width:min(250px, calc(100vw - 24px));
-        max-height:min(40vh, 320px); overflow:auto; gap:8px;
-      }
+      #cust-right-ui { width:min(200px, calc(100vw - 132px)); gap:8px; }
       #cust-stats, #cust-progression { padding:12px; border-radius:16px; }
+      #cust-progression {
+        right:12px; left:12px; bottom:62px; width:auto; max-height:min(38vh, 280px);
+      }
       .cust-preset-row { grid-template-columns:1fr auto; }
       .cust-preset-name { grid-column:1 / -1; min-height:30px; font-size:9px; }
       .cust-mini-btn { min-width:0; padding:8px 10px; }
@@ -384,6 +390,7 @@
         <canvas id="cust-canvas"></canvas>
         <div id="cust-topbar">
           <button class="btn-splash-back" id="btn-back-cust">RETOUR</button>
+          <button type="button" id="btn-cust-progress">PROGRESSION</button>
           <div id="cust-right-ui">
             <div id="cust-stats">
               <div class="cust-stat-row">
@@ -403,14 +410,14 @@
                 <div class="cust-pips" id="stat-rate"></div>
               </div>
             </div>
-            <div id="cust-progression">
-              <div class="cust-panel-title">PROGRESSION</div>
-              <div class="cust-meta-line"><span>VICTOIRES</span><span class="cust-meta-value" id="cust-wins">0</span></div>
-              <input id="cust-build-name" class="cust-build-input" type="text" maxlength="22" placeholder="NOM DU BUILD"/>
-              <div class="cust-presets" id="cust-presets"></div>
-              <div id="cust-unlock-line"></div>
-            </div>
           </div>
+        </div>
+        <div id="cust-progression" class="hidden">
+          <div class="cust-panel-title">PROGRESSION</div>
+          <div class="cust-meta-line"><span>VICTOIRES</span><span class="cust-meta-value" id="cust-wins">0</span></div>
+          <input id="cust-build-name" class="cust-build-input" type="text" maxlength="22" placeholder="NOM DU BUILD"/>
+          <div class="cust-presets" id="cust-presets"></div>
+          <div id="cust-unlock-line"></div>
         </div>
         <div id="cust-piece-chip" class="hidden">
           <div id="cust-piece-type"></div>
@@ -3232,6 +3239,7 @@
   let custLoopGen = 0;
   let custChoiceIndex = 0;
   let custStyleIndex = 0;
+  let custProgressOpen = false;
   const CUST_SWIPE_STEP = 36;
 
   // ── Tween engine ─────────────────────────────
@@ -3329,6 +3337,12 @@
     });
   }
 
+  function setCustProgressOpen(open) {
+    custProgressOpen = !!open;
+    $('cust-progression')?.classList.toggle('hidden', !custProgressOpen);
+    $('btn-cust-progress')?.classList.toggle('active', custProgressOpen);
+  }
+
   function savePresetSlot(index) {
     savedPresets[index] = snapshotCurrentBuild();
     savePresets();
@@ -3365,6 +3379,7 @@
       updateStats();
       updateCustSelectionUI();
       updateCustProgressUI();
+      setCustProgressOpen(false);
       startCustLoop();
       return;
     }
@@ -3438,6 +3453,7 @@
     updateStats();
     updateCustSelectionUI();
     updateCustProgressUI();
+    setCustProgressOpen(false);
     startCustLoop();
 
     const drag = { on: false, moved: false, x0: 0, y0: 0, x: 0, y: 0, mode: null, swipeX: 0, swipeY: 0 };
@@ -3546,6 +3562,9 @@
       e.target.value = buildName;
       saveRobotConfig();
       updateCustProgressUI();
+    });
+    $('btn-cust-progress').addEventListener('click', () => {
+      setCustProgressOpen(!custProgressOpen);
     });
   }
 
