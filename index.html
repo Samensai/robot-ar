@@ -194,32 +194,32 @@
        CUSTOMISEUR 3D
     ═══════════════════════════════════════════ */
     #splash { overflow-y:auto; -webkit-overflow-scrolling:touch; }
-    #view-customize { overflow-y:auto; -webkit-overflow-scrolling:touch;
-      width:100%; max-width:480px; padding-bottom:12px; }
-    #cust-box { position:relative; width:100%; height:clamp(300px,54vh,460px);
-      border:1px solid rgba(0,245,255,0.14); border-radius:4px;
-      overflow:hidden; margin-bottom:10px; cursor:grab; flex-shrink:0; }
-    #cust-canvas { display:block; }
-    #cust-hint { position:absolute; bottom:7px; left:0; right:0; text-align:center;
-      font-family:var(--font-mono); font-size:9px; color:rgba(0,245,255,0.32);
-      letter-spacing:.12em; pointer-events:none; transition:color .3s; }
-    #cust-swap { position:absolute; inset:0; background:rgba(5,8,16,0.93);
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:8px; padding:14px; backdrop-filter:blur(8px); }
-    #cust-swap.hidden { display:none; }
-    #cust-swap-title { font-family:var(--font-mono); font-size:10px;
-      color:rgba(0,245,255,0.45); letter-spacing:.2em; margin-bottom:2px; }
-    .cust-card { width:100%; max-width:250px; background:rgba(0,245,255,0.05);
-      border:1.5px solid rgba(0,245,255,0.2); border-radius:4px; padding:9px 12px;
-      cursor:pointer; display:flex; align-items:center; gap:10px;
-      transition:border-color .15s,background .15s; }
-    .cust-card:active,.cust-card.cur { border-color:var(--cyan); background:rgba(0,245,255,0.12); }
-    .cust-card-name { font-family:var(--font-mono); font-size:11px; color:var(--cyan); }
-    .cust-card-stats { font-size:10px; color:rgba(200,230,255,0.4); margin-top:1px; }
-    #cust-swap-cancel { font-family:var(--font-mono); font-size:10px;
-      color:rgba(200,230,255,0.28); background:none; border:none; cursor:pointer;
-      letter-spacing:.1em; margin-top:2px; }
-    #cust-stats { width:100%; display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
+    #view-customize {
+      position:fixed; inset:0; width:100%; max-width:none; padding:0; overflow:hidden;
+      background:
+        radial-gradient(circle at top, rgba(0,245,255,0.1), transparent 34%),
+        radial-gradient(circle at bottom, rgba(255,119,51,0.1), transparent 32%),
+        linear-gradient(180deg, #050810 0%, #08111b 45%, #04070d 100%);
+    }
+    #cust-box { position:relative; width:100%; height:100%; overflow:hidden; cursor:grab; flex-shrink:0; touch-action:none; }
+    #cust-canvas { display:block; width:100%; height:100%; touch-action:none; }
+    #cust-hint { position:absolute; bottom:22px; left:50%; transform:translateX(-50%); text-align:center;
+      font-family:var(--font-mono); font-size:10px; color:rgba(220,245,255,0.55);
+      letter-spacing:.14em; pointer-events:none; transition:opacity .25s,color .25s;
+      padding:8px 14px; border:1px solid rgba(0,245,255,0.14); border-radius:999px;
+      background:rgba(3,9,16,0.62); backdrop-filter:blur(10px); white-space:nowrap; }
+    #cust-topbar { position:absolute; top:16px; left:16px; right:16px; z-index:2;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px; pointer-events:none; }
+    #cust-topbar > * { pointer-events:auto; }
+    #btn-back-cust {
+      align-self:flex-start; margin:0; background:rgba(3,10,18,0.68);
+      border:1px solid rgba(0,245,255,0.18); border-radius:999px; padding:11px 16px;
+      backdrop-filter:blur(10px);
+    }
+    #cust-right-ui { width:min(320px, calc(100vw - 32px)); display:flex; flex-direction:column; gap:10px; }
+    #cust-stats { width:100%; display:flex; flex-direction:column; gap:7px;
+      background:rgba(3,10,18,0.72); border:1px solid rgba(0,245,255,0.12); border-radius:18px;
+      padding:14px 14px 12px; backdrop-filter:blur(12px); }
     .cust-stat-row { display:flex; align-items:center; gap:8px; }
     .cust-stat-label { font-family:var(--font-mono); font-size:9px;
       color:rgba(0,245,255,0.4); letter-spacing:.12em; width:62px; flex-shrink:0; }
@@ -228,12 +228,14 @@
       background:rgba(0,245,255,0.1); border:1px solid rgba(0,245,255,0.14); }
     .cust-pip.on { background:var(--cyan); border-color:var(--cyan); box-shadow:0 0 4px var(--cyan); }
     .cust-pip.on.warn { background:#ff9900; border-color:#ff9900; box-shadow:0 0 4px #ff9900; }
-    #cust-colors { width:100%; display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
-    #cust-color-controls { flex:1; display:flex; flex-direction:column; gap:8px; }
+    #cust-colors { width:100%; display:flex; align-items:flex-start; gap:10px; }
+    #cust-color-controls { flex:1; display:flex; flex-direction:column; gap:8px;
+      background:rgba(3,10,18,0.72); border:1px solid rgba(0,245,255,0.12); border-radius:18px;
+      padding:12px; backdrop-filter:blur(12px); }
     #btn-cust-colors {
       width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
       font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; color:var(--cyan);
-      background:rgba(0,0,0,0.45); border:1.5px solid rgba(0,245,255,0.18); border-radius:4px;
+      background:rgba(0,0,0,0.45); border:1.5px solid rgba(0,245,255,0.18); border-radius:12px;
       padding:10px 12px; cursor:pointer;
     }
     #cust-color-preview { display:flex; align-items:center; gap:7px; }
@@ -243,13 +245,13 @@
     }
     #cust-color-panel {
       background:rgba(0,0,0,0.35); border:1px solid rgba(0,245,255,0.12);
-      border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:10px;
+      border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:10px;
     }
     #cust-color-panel.hidden { display:none; }
     #cust-color-targets { display:flex; gap:8px; }
     .cust-color-target {
       flex:1; font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; color:rgba(200,230,255,0.7);
-      background:rgba(0,0,0,0.45); border:1px solid rgba(0,245,255,0.15); border-radius:4px;
+      background:rgba(0,0,0,0.45); border:1px solid rgba(0,245,255,0.15); border-radius:8px;
       padding:9px 10px; cursor:pointer;
     }
     .cust-color-target.active { color:var(--cyan); border-color:rgba(0,245,255,0.45); background:rgba(0,245,255,0.08); }
@@ -262,6 +264,34 @@
       border:2px solid transparent; flex-shrink:0;
       transition:transform .15s,border-color .15s,box-shadow .15s; }
     .cust-swatch.sel { border-color:#fff; transform:scale(1.2); }
+    #cust-arrows {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between;
+      padding:0 16px; pointer-events:none; z-index:2;
+    }
+    #cust-arrows.hidden { display:none; }
+    .cust-arrow {
+      width:58px; height:58px; border-radius:50%; border:1px solid rgba(0,245,255,0.22);
+      background:rgba(3,10,18,0.72); color:var(--cyan); font-size:26px; cursor:pointer;
+      box-shadow:0 0 24px rgba(0,245,255,0.12); backdrop-filter:blur(10px); pointer-events:auto;
+    }
+    #cust-piece-chip {
+      position:absolute; left:50%; top:86px; transform:translateX(-50%); z-index:2;
+      min-width:200px; max-width:min(72vw, 360px); padding:10px 14px;
+      border:1px solid rgba(0,245,255,0.16); border-radius:16px; background:rgba(3,10,18,0.72);
+      backdrop-filter:blur(12px); text-align:center; pointer-events:none;
+    }
+    #cust-piece-chip.hidden { display:none; }
+    #cust-piece-type { font-family:var(--font-mono); font-size:9px; letter-spacing:.18em; color:rgba(0,245,255,0.42); }
+    #cust-piece-name { margin-top:4px; font-family:var(--font-mono); font-size:13px; color:var(--cyan); }
+    #cust-piece-stats { margin-top:4px; font-size:10px; color:rgba(220,240,255,0.55); }
+    @media (max-width: 720px) {
+      #cust-topbar { flex-direction:column; align-items:stretch; }
+      #cust-right-ui { width:100%; }
+      #cust-piece-chip { top:88px; max-width:calc(100vw - 40px); }
+      #cust-arrows { padding:0 10px; }
+      .cust-arrow { width:50px; height:50px; }
+      #cust-hint { bottom:16px; max-width:calc(100vw - 32px); white-space:normal; }
+    }
 
     /* ── Jeu en cours ── */
     #game-controls { position:fixed; top:92px; right:16px; z-index:30;
@@ -407,55 +437,60 @@
 
     <!-- Vue personnalisation plein écran -->
     <div class="splash-view" id="view-customize" style="display:none">
-      <button class="btn-splash-back" id="btn-back-cust" style="align-self:flex-start;margin-bottom:10px;">← RETOUR</button>
       <div id="cust-box">
         <canvas id="cust-canvas"></canvas>
-        <div id="cust-hint">TAP UNE PIÈCE POUR LA MODIFIER</div>
-        <div id="cust-swap" class="hidden">
-          <div id="cust-swap-title"></div>
-          <div id="cust-swap-cards"></div>
-          <button id="cust-swap-cancel">✕ ANNULER</button>
-        </div>
-      </div>
-      <!-- Statistiques -->
-      <div id="cust-stats">
-        <div class="cust-stat-row">
-          <span class="cust-stat-label">VITESSE</span>
-          <div class="cust-pips" id="stat-speed"></div>
-        </div>
-        <div class="cust-stat-row">
-          <span class="cust-stat-label">VIE</span>
-          <div class="cust-pips" id="stat-hp"></div>
-        </div>
-        <div class="cust-stat-row">
-          <span class="cust-stat-label">DÉGÂTS</span>
-          <div class="cust-pips" id="stat-dmg"></div>
-        </div>
-        <div class="cust-stat-row">
-          <span class="cust-stat-label">CADENCE</span>
-          <div class="cust-pips" id="stat-rate"></div>
-        </div>
-      </div>
-      <!-- Couleur -->
-      <div id="cust-colors">
-        <span class="cust-stat-label">COULEURS</span>
-        <div id="cust-color-controls">
-          <button id="btn-cust-colors" type="button">
-            <span>OUVRIR LE MENU</span>
-            <span id="cust-color-preview">
-              <span class="cust-color-dot" id="cust-color1-dot"></span>
-              <span class="cust-color-dot" id="cust-color2-dot"></span>
-            </span>
-          </button>
-          <div id="cust-color-panel" class="hidden">
-            <div id="cust-color-targets">
-              <button class="cust-color-target active" id="btn-color-primary" type="button">COULEUR 1</button>
-              <button class="cust-color-target" id="btn-color-secondary" type="button">COULEUR 2</button>
+        <div id="cust-topbar">
+          <button class="btn-splash-back" id="btn-back-cust">RETOUR</button>
+          <div id="cust-right-ui">
+            <div id="cust-stats">
+              <div class="cust-stat-row">
+                <span class="cust-stat-label">VITESSE</span>
+                <div class="cust-pips" id="stat-speed"></div>
+              </div>
+              <div class="cust-stat-row">
+                <span class="cust-stat-label">VIE</span>
+                <div class="cust-pips" id="stat-hp"></div>
+              </div>
+              <div class="cust-stat-row">
+                <span class="cust-stat-label">DEGATS</span>
+                <div class="cust-pips" id="stat-dmg"></div>
+              </div>
+              <div class="cust-stat-row">
+                <span class="cust-stat-label">CADENCE</span>
+                <div class="cust-pips" id="stat-rate"></div>
+              </div>
             </div>
-            <div id="cust-color-help"></div>
-            <div id="cust-color-swatches"></div>
+            <div id="cust-colors">
+              <div id="cust-color-controls">
+                <button id="btn-cust-colors" type="button">
+                  <span>OUVRIR LE MENU</span>
+                  <span id="cust-color-preview">
+                    <span class="cust-color-dot" id="cust-color1-dot"></span>
+                    <span class="cust-color-dot" id="cust-color2-dot"></span>
+                  </span>
+                </button>
+                <div id="cust-color-panel" class="hidden">
+                  <div id="cust-color-targets">
+                    <button class="cust-color-target active" id="btn-color-primary" type="button">COULEUR 1</button>
+                    <button class="cust-color-target" id="btn-color-secondary" type="button">COULEUR 2</button>
+                  </div>
+                  <div id="cust-color-help"></div>
+                  <div id="cust-color-swatches"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+        <div id="cust-piece-chip" class="hidden">
+          <div id="cust-piece-type"></div>
+          <div id="cust-piece-name"></div>
+          <div id="cust-piece-stats"></div>
+        </div>
+        <div id="cust-arrows" class="hidden">
+          <button class="cust-arrow" id="cust-arrow-prev" type="button"><</button>
+          <button class="cust-arrow" id="cust-arrow-next" type="button">></button>
+        </div>
+        <div id="cust-hint">TAP UNE PIECE POUR LA MODIFIER</div>
       </div>
     </div>
 
@@ -2003,28 +2038,55 @@
   let custRunning = false;
   let custInitialized = false;
   let custLoopGen = 0;
+  let custChoiceIndex = 0;
+  const CUST_SWIPE_STEP = 36;
 
   // ── Tween engine ─────────────────────────────
   const _custTweens = [];
   function custTweenTo(target, props, dur, onDone) {
     for (let i = _custTweens.length - 1; i >= 0; i--) {
       const tw = _custTweens[i];
-      if (tw.target === target && Object.keys(props).some(k => k in tw.end))
-        _custTweens.splice(i, 1);
+      if (tw.target === target && Object.keys(props).some(k => k in tw.end)) _custTweens.splice(i, 1);
     }
     const start = {};
     for (const k in props) start[k] = target[k];
-    _custTweens.push({ target, start, end: {...props}, t0: performance.now(), dur, onDone });
+    _custTweens.push({ target, start, end: { ...props }, t0: performance.now(), dur, onDone });
   }
   function tickCustTweens() {
     const now = performance.now();
     for (let i = _custTweens.length - 1; i >= 0; i--) {
       const tw = _custTweens[i];
       const t = Math.min(1, (now - tw.t0) / tw.dur);
-      const e = 1 - (1-t)*(1-t)*(1-t); // cubic ease-out
+      const e = 1 - (1 - t) * (1 - t) * (1 - t);
       for (const k in tw.end) tw.target[k] = tw.start[k] + (tw.end[k] - tw.start[k]) * e;
       if (t >= 1) { _custTweens.splice(i, 1); tw.onDone?.(); }
     }
+  }
+
+  function getCustOptionKeys(pieceType) {
+    return Object.keys(PIECES[pieceType]?.options || {});
+  }
+
+  function getCustCurrentOption(pieceType) {
+    return PIECES[pieceType].options[PIECES[pieceType].current];
+  }
+
+  function updateCustSelectionUI() {
+    const arrows = $('cust-arrows');
+    const chip = $('cust-piece-chip');
+    if (!custSelectedPiece) {
+      arrows?.classList.add('hidden');
+      chip?.classList.add('hidden');
+      $('cust-hint').textContent = 'TAP UNE PIECE POUR LA MODIFIER';
+      return;
+    }
+    const def = getCustCurrentOption(custSelectedPiece);
+    if ($('cust-piece-type')) $('cust-piece-type').textContent = PIECES[custSelectedPiece].label;
+    if ($('cust-piece-name')) $('cust-piece-name').textContent = def.name;
+    if ($('cust-piece-stats')) $('cust-piece-stats').textContent = def.stats;
+    arrows?.classList.remove('hidden');
+    chip?.classList.remove('hidden');
+    $('cust-hint').textContent = 'SWIPE OU UTILISE LES FLECHES, PUIS TAP AILLEURS POUR VALIDER';
   }
 
   function initCustomizer() {
@@ -2033,6 +2095,7 @@
       buildCustRobot();
       renderColorUI();
       updateStats();
+      updateCustSelectionUI();
       startCustLoop();
       return;
     }
@@ -2048,37 +2111,50 @@
     custRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     custScene = new THREE.Scene();
-    custScene.background = new THREE.Color(0x060a10);
-    custScene.fog = new THREE.FogExp2(0x060a10, 0.55);
+    custScene.background = new THREE.Color(0x050810);
+    custScene.fog = new THREE.FogExp2(0x050810, 0.32);
 
     custCamera = new THREE.PerspectiveCamera(42, 1, 0.01, 50);
 
-    custScene.add(new THREE.AmbientLight(0x8888bb, 0.7));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.3);
-    dir.position.set(2, 4, 3); dir.castShadow = true;
-    dir.shadow.mapSize.set(512, 512);
+    custScene.add(new THREE.AmbientLight(0x9cb5d4, 0.82));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.45);
+    dir.position.set(2.6, 4.5, 3.2);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
     custScene.add(dir);
-    const fillCust = new THREE.DirectionalLight(0x00f5ff, 0.45);
-    fillCust.position.set(-2, 1, -2);
+    const fillCust = new THREE.DirectionalLight(0x00f5ff, 0.4);
+    fillCust.position.set(-2.4, 1.8, -2.2);
     custScene.add(fillCust);
+    const warm = new THREE.PointLight(0xff7733, 0.5, 8, 2);
+    warm.position.set(0, 1.4, 1.8);
+    custScene.add(warm);
 
     const plat = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.65, 0.65, 0.022, 48),
-      new THREE.MeshStandardMaterial({ color:0x0d1f2d, metalness:.8, roughness:.3 })
+      new THREE.CylinderGeometry(0.78, 0.9, 0.08, 56),
+      new THREE.MeshStandardMaterial({ color:0x0c1624, metalness:.68, roughness:.34 })
     );
+    plat.position.y = -0.04;
     plat.receiveShadow = true;
     custScene.add(plat);
     const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(0.65, 0.007, 6, 48),
-      new THREE.MeshStandardMaterial({ color:0x00f5ff, emissive:0x00f5ff, emissiveIntensity:0.9 })
+      new THREE.TorusGeometry(0.78, 0.016, 8, 72),
+      new THREE.MeshStandardMaterial({ color:0x00f5ff, emissive:0x00f5ff, emissiveIntensity:.42, metalness:.85, roughness:.18 })
     );
     rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.01;
     custScene.add(rim);
+    const halo = new THREE.Mesh(
+      new THREE.CircleGeometry(1.45, 48),
+      new THREE.MeshBasicMaterial({ color:0x0d2230, transparent:true, opacity:.35 })
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = -0.039;
+    custScene.add(halo);
 
     function custResize() {
       const box = $('cust-box');
-      const w = box.clientWidth || 300;
-      const h = box.clientHeight || 300;
+      const w = box.clientWidth || window.innerWidth || 300;
+      const h = box.clientHeight || window.innerHeight || 300;
       custRenderer.setSize(w, h);
       custCamera.aspect = w / h;
       custCamera.updateProjectionMatrix();
@@ -2091,49 +2167,78 @@
     custUpdateCamera();
     renderColorUI();
     updateStats();
+    updateCustSelectionUI();
     startCustLoop();
 
-    // Pointer events (orbit + tap)
-    const drag = { on: false, moved: false, x0: 0, y0: 0, x: 0, y: 0 };
+    const drag = { on: false, moved: false, x0: 0, y0: 0, x: 0, y: 0, mode: null, swipeCarry: 0 };
     canvas.addEventListener('pointerdown', e => {
-      drag.on = true; drag.moved = false;
+      drag.on = true;
+      drag.moved = false;
+      drag.mode = null;
+      drag.swipeCarry = 0;
       drag.x0 = drag.x = e.clientX;
       drag.y0 = drag.y = e.clientY;
       custLastInteraction = Date.now();
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener('pointermove', e => {
-      if (!drag.on) return;
-      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      drag.x = e.clientX; drag.y = e.clientY;
-      if (Math.abs(e.clientX - drag.x0) > 4 || Math.abs(e.clientY - drag.y0) > 4) drag.moved = true;
-      if (drag.moved) {
+      if (!drag.on || custSwapping) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      const totalX = e.clientX - drag.x0;
+      const totalY = e.clientY - drag.y0;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      if (Math.abs(totalX) > 5 || Math.abs(totalY) > 5) drag.moved = true;
+      if (!drag.moved) return;
+
+      if (!drag.mode) {
+        if (custSelectedPiece && Math.abs(totalX) > 12 && Math.abs(totalX) > Math.abs(totalY) * 1.15) drag.mode = 'cycle';
+        else drag.mode = 'orbit';
+      }
+
+      custLastInteraction = Date.now();
+      if (drag.mode === 'cycle' && custSelectedPiece) {
+        drag.swipeCarry += dx;
+        while (drag.swipeCarry <= -CUST_SWIPE_STEP) {
+          drag.swipeCarry += CUST_SWIPE_STEP;
+          cycleCustPiece(1);
+        }
+        while (drag.swipeCarry >= CUST_SWIPE_STEP) {
+          drag.swipeCarry -= CUST_SWIPE_STEP;
+          cycleCustPiece(-1);
+        }
+      } else {
         custOrbit.azimuth -= dx * 0.013;
         custOrbit.elevation = Math.max(-0.25, Math.min(1.1, custOrbit.elevation + dy * 0.009));
-        custLastInteraction = Date.now();
         custUpdateCamera();
       }
     });
     canvas.addEventListener('pointerup', e => {
       if (!drag.moved) onCustTap(e.clientX, e.clientY);
       drag.on = false;
+      drag.mode = null;
+      drag.swipeCarry = 0;
     });
-    canvas.addEventListener('pointercancel', () => { drag.on = false; });
+    canvas.addEventListener('pointercancel', () => {
+      drag.on = false;
+      drag.mode = null;
+      drag.swipeCarry = 0;
+    });
 
-    // Pinch zoom
     let pinch0 = 0;
     canvas.addEventListener('touchstart', e => {
       if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
-        pinch0 = Math.sqrt(dx*dx + dy*dy);
+        pinch0 = Math.sqrt(dx * dx + dy * dy);
       }
     }, { passive: true });
     canvas.addEventListener('touchmove', e => {
       if (e.touches.length !== 2 || !pinch0) return;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const d = Math.sqrt(dx*dx + dy*dy);
+      const d = Math.sqrt(dx * dx + dy * dy);
       custOrbit.distance = Math.max(0.9, Math.min(3.2, custOrbit.distance * pinch0 / d));
       pinch0 = d;
       custLastInteraction = Date.now();
@@ -2141,10 +2246,8 @@
     }, { passive: true });
     canvas.addEventListener('touchend', () => { pinch0 = 0; }, { passive: true });
 
-    $('cust-swap-cancel').addEventListener('click', () => {
-      $('cust-swap').classList.add('hidden');
-      custDeselect();
-    });
+    $('cust-arrow-prev').addEventListener('click', () => cycleCustPiece(-1));
+    $('cust-arrow-next').addEventListener('click', () => cycleCustPiece(1));
     $('btn-cust-colors').addEventListener('click', () => {
       custColorMenuOpen = !custColorMenuOpen;
       renderColorUI();
@@ -2166,10 +2269,10 @@
       if (custLoopGen !== gen || !custRunning) return;
       tickCustTweens();
       if (custBobActive && custSelectedGroup) {
-        custSelectedGroup.position.y = custBobBase + Math.sin(Date.now() * 0.003) * 0.015;
+        custSelectedGroup.position.y = custBobBase + Math.sin(Date.now() * 0.003) * 0.018;
       }
-      if (custRobotGroup && !custSelectedPiece && Date.now() - custLastInteraction > 1800) {
-        custOrbit.azimuth += 0.007;
+      if (custRobotGroup && !custSelectedPiece && Date.now() - custLastInteraction > 2200) {
+        custOrbit.azimuth += 0.005;
         custUpdateCamera();
       }
       custRenderer.render(custScene, custCamera);
@@ -2177,53 +2280,116 @@
     })();
   }
 
-  function custDeselect(cb) {
+  function attachSelectedGroup(cb) {
     custBobActive = false;
     const g = custSelectedGroup;
-    custSelectedGroup = null;
     if (g) {
-      custTweenTo(g.position, {y: 0}, 200, () => {
+      custTweenTo(g.position, { y: 0 }, 220, () => {
         custSelectedPiece = null;
+        custSelectedGroup = null;
         buildCustRobot();
-        $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
+        updateCustSelectionUI();
         cb?.();
       });
     } else {
       custSelectedPiece = null;
+      custSelectedGroup = null;
       buildCustRobot();
-      $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
+      updateCustSelectionUI();
       cb?.();
     }
   }
 
-  function selectCustPiece(pt) {
-    custSelectedPiece = pt;
+  function selectCustPiece(pieceType) {
+    custLastInteraction = Date.now();
+    custSelectedPiece = pieceType;
+    const keys = getCustOptionKeys(pieceType);
+    custChoiceIndex = Math.max(0, keys.indexOf(PIECES[pieceType].current));
+    custBobActive = false;
+    custBobBase = 0.15;
     buildCustRobot();
-    custSelectedGroup = custRobotGroup.children.find(c => c.name === pt) || null;
+    custSelectedGroup = custRobotGroup.children.find(c => c.name === pieceType) || null;
     if (custSelectedGroup) {
-      custTweenTo(custSelectedGroup.position, {y: 0.15}, 200, () => {
+      custTweenTo(custSelectedGroup.position, { y: 0.15 }, 220, () => {
         custBobActive = true;
         custBobBase = 0.15;
       });
     }
-    $('cust-hint').textContent = 'RE-TAP POUR CHANGER LA PIÈCE';
+    updateCustSelectionUI();
+  }
+
+  function applyCustPiecePreview(pieceType, key, animate = true) {
+    if (custSwapping || !pieceType) return;
+    custChoiceIndex = Math.max(0, getCustOptionKeys(pieceType).indexOf(key));
+    if (PIECES[pieceType].current === key) {
+      updateCustSelectionUI();
+      updateStats();
+      return;
+    }
+
+    const finalize = () => {
+      PIECES[pieceType].current = key;
+      saveRobotConfig();
+      buildCustRobot();
+      custSelectedGroup = custRobotGroup.children.find(c => c.name === pieceType) || null;
+      if (custSelectedGroup) {
+        custSelectedGroup.position.y = 0.24;
+        custSelectedGroup.scale.set(0.001, 0.001, 0.001);
+        custTweenTo(custSelectedGroup.position, { y: 0.15 }, 260, null);
+        custTweenTo(custSelectedGroup.scale, { x: 1, y: 1, z: 1 }, 260, () => {
+          custSwapping = false;
+          custBobActive = true;
+          custBobBase = 0.15;
+          updateStats();
+          updateCustSelectionUI();
+        });
+      } else {
+        custSwapping = false;
+        updateStats();
+        updateCustSelectionUI();
+      }
+    };
+
+    if (!animate) {
+      finalize();
+      return;
+    }
+
+    custSwapping = true;
+    custBobActive = false;
+    const flyGroup = custSelectedGroup || custRobotGroup?.children.find(c => c.name === pieceType);
+    if (!flyGroup) {
+      finalize();
+      return;
+    }
+    custTweenTo(flyGroup.position, { y: 0.55 }, 180, null);
+    custTweenTo(flyGroup.scale, { x: 0.001, y: 0.001, z: 0.001 }, 180, finalize);
+  }
+
+  function cycleCustPiece(dir) {
+    if (!custSelectedPiece || custSwapping) return;
+    custLastInteraction = Date.now();
+    const keys = getCustOptionKeys(custSelectedPiece);
+    if (!keys.length) return;
+    custChoiceIndex = (custChoiceIndex + dir + keys.length) % keys.length;
+    applyCustPiecePreview(custSelectedPiece, keys[custChoiceIndex], true);
   }
 
   function custUpdateCamera() {
     const az = custOrbit.azimuth, el = custOrbit.elevation, d = custOrbit.distance;
     custCamera.position.set(
       d * Math.sin(az) * Math.cos(el),
-      d * Math.sin(el) + 0.12,
+      d * Math.sin(el) + 0.18,
       d * Math.cos(az) * Math.cos(el)
     );
-    custCamera.lookAt(0, 0.14, 0);
+    custCamera.lookAt(0, 0.18, 0);
   }
 
   function buildCustRobot() {
     if (custRobotGroup) custScene.remove(custRobotGroup);
     custRobotGroup = new THREE.Group();
 
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.18,.025,.01), MAT.accent.clone());
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.18, .025, .01), MAT.accent.clone());
     eye.position.set(0, 0.14, 0.19);
     eye.userData.pieceType = 'eye';
     eye.castShadow = true;
@@ -2236,8 +2402,8 @@
 
     if (custSelectedPiece) {
       const hlMat = new THREE.MeshStandardMaterial({
-        color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 1.1,
-        metalness: .9, roughness: .05, transparent: true, opacity: .93
+        color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: .9,
+        metalness: .88, roughness: .08, transparent: true, opacity: .88
       });
       custRobotGroup.traverse(o => {
         if (!o.isMesh || o.userData.pieceType !== custSelectedPiece) return;
@@ -2246,101 +2412,49 @@
       });
     }
     custScene.add(custRobotGroup);
+    if (custSelectedPiece) {
+      custSelectedGroup = custRobotGroup.children.find(c => c.name === custSelectedPiece) || null;
+      if (custSelectedGroup) custSelectedGroup.position.y = custBobBase || 0.15;
+    }
   }
 
   function onCustTap(cx, cy) {
     if (!custRobotGroup || custSwapping) return;
     const canvas = $('cust-canvas');
     const rect = canvas.getBoundingClientRect();
-    const tx = ((cx - rect.left) / rect.width)  * 2 - 1;
-    const ty = -((cy - rect.top)  / rect.height) * 2 + 1;
+    const tx = ((cx - rect.left) / rect.width) * 2 - 1;
+    const ty = -((cy - rect.top) / rect.height) * 2 + 1;
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(tx, ty), custCamera);
     const hits = ray.intersectObject(custRobotGroup, true);
 
-    if (!hits.length) { if (custSelectedPiece) custDeselect(); return; }
-    const pt = hits[0].object.userData.pieceType;
-    if (!pt || pt === 'eye') { if (custSelectedPiece) custDeselect(); return; }
-
-    if (custSelectedPiece === pt) {
-      showCustSwap(pt);
-    } else if (custSelectedPiece) {
-      custDeselect(() => selectCustPiece(pt));
-    } else {
-      selectCustPiece(pt);
-    }
-  }
-
-  function showCustSwap(pieceType) {
-    $('cust-swap-title').textContent = '— ' + PIECES[pieceType].label + ' —';
-    const cards = $('cust-swap-cards');
-    cards.innerHTML = '';
-    Object.entries(PIECES[pieceType].options).forEach(([key, opt]) => {
-      const card = document.createElement('div');
-      card.className = 'cust-card' + (PIECES[pieceType].current === key ? ' cur' : '');
-      card.innerHTML = `<span style="font-size:17px;flex-shrink:0">${opt.icon}</span>
-        <div><div class="cust-card-name">${opt.name}</div>
-        <div class="cust-card-stats">${opt.stats}</div></div>`;
-      card.addEventListener('click', () => swapCustPiece(pieceType, key));
-      cards.appendChild(card);
-    });
-    $('cust-swap').classList.remove('hidden');
-  }
-
-  function swapCustPiece(pieceType, key) {
-    if (PIECES[pieceType].current === key) {
-      $('cust-swap').classList.add('hidden');
-      custDeselect();
+    if (!hits.length) {
+      if (custSelectedPiece) attachSelectedGroup();
       return;
     }
-    custSwapping = true;
-    custBobActive = false;
-    $('cust-swap').classList.add('hidden');
-    const flyGroup = custSelectedGroup || custRobotGroup.children.find(c => c.name === pieceType);
-    if (flyGroup) {
-      custTweenTo(flyGroup.position, {y: 0.5}, 220, null);
-      custTweenTo(flyGroup.scale, {x: 0.001, y: 0.001, z: 0.001}, 220, () => {
-        PIECES[pieceType].current = key;
-        saveRobotConfig();
-        custSelectedPiece = null;
-        custSelectedGroup = null;
-        buildCustRobot();
-        const ng = custRobotGroup.children.find(c => c.name === pieceType);
-        if (ng) {
-          ng.position.y = 0.3;
-          ng.scale.set(0.001, 0.001, 0.001);
-          custTweenTo(ng.position, {y: 0}, 300, null);
-          custTweenTo(ng.scale, {x: 1, y: 1, z: 1}, 300, () => {
-            custSwapping = false;
-            updateStats();
-            $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
-          });
-        } else {
-          custSwapping = false; updateStats();
-          $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
-        }
-      });
-    } else {
-      PIECES[pieceType].current = key;
-      saveRobotConfig();
-      custSelectedPiece = null; custSelectedGroup = null;
-      buildCustRobot(); custSwapping = false; updateStats();
-      $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
+    const pt = hits[0].object.userData.pieceType;
+    if (!pt || pt === 'eye') {
+      if (custSelectedPiece) attachSelectedGroup();
+      return;
     }
+
+    if (custSelectedPiece === pt) return;
+    if (custSelectedPiece) attachSelectedGroup(() => selectCustPiece(pt));
+    else selectCustPiece(pt);
   }
 
   function updateStats() {
     const w = PIECES.wheels.options[PIECES.wheels.current];
     const b = PIECES.body.options[PIECES.body.current];
     const f = PIECES.front.options[PIECES.front.current];
-    const speedPips   = Math.max(1, Math.round(w.speed * b.speed / 1.54 * 4) + 1);
-    const hpPips      = Math.max(1, Math.round(w.armor * b.armor / 1.52 * 4) + 1);
-    const dmgPips     = Math.max(1, Math.min(5, Math.round(f.attack / 1.3 * 5)));
+    const speedPips = Math.max(1, Math.round(w.speed * b.speed / 1.54 * 4) + 1);
+    const hpPips = Math.max(1, Math.round(w.armor * b.armor / 1.52 * 4) + 1);
+    const dmgPips = Math.max(1, Math.min(5, Math.round(f.attack / 1.3 * 5)));
     const cadencePips = Math.max(1, Math.min(5, Math.round((1 - (f.cooldownMs - 780) / 470) * 4) + 1));
-    renderPips('stat-speed',  Math.min(5, speedPips), false);
-    renderPips('stat-hp',     Math.min(5, hpPips),    hpPips <= 1);
-    renderPips('stat-dmg',    dmgPips,                false);
-    renderPips('stat-rate',   cadencePips,            false);
+    renderPips('stat-speed', Math.min(5, speedPips), false);
+    renderPips('stat-hp', Math.min(5, hpPips), hpPips <= 1);
+    renderPips('stat-dmg', dmgPips, false);
+    renderPips('stat-rate', cadencePips, false);
   }
 
   function renderPips(id, count, warn) {
@@ -2363,7 +2477,7 @@
       const selectedId = custColorTarget === 'primary' ? robotPrimaryColorId : robotSecondaryColorId;
       sw.className = 'cust-swatch' + (preset.id === selectedId ? ' sel' : '');
       sw.style.background = preset.hex;
-      sw.style.boxShadow  = preset.id === selectedId ? `0 0 7px ${preset.hex}` : 'none';
+      sw.style.boxShadow = preset.id === selectedId ? `0 0 7px ${preset.hex}` : 'none';
       sw.title = preset.id;
       sw.addEventListener('click', () => {
         if (custSwapping) return;
@@ -2371,19 +2485,14 @@
         else robotSecondaryColorId = preset.id;
         saveRobotConfig();
         initMaterials();
-        custSelectedPiece = null;
-        custSelectedGroup = null;
-        custBobActive = false;
-        _custTweens.length = 0;
         buildCustRobot();
-        $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
+        updateCustSelectionUI();
         renderColorUI();
       });
       container.appendChild(sw);
     });
   }
 
-  // ── GLB Export (depuis menu principal) ────────
   function renderColorUI() {
     const primary = getColorPreset(robotPrimaryColorId);
     const secondary = getColorPreset(robotSecondaryColorId);
@@ -2397,11 +2506,13 @@
     if ($('btn-color-secondary')) $('btn-color-secondary').classList.toggle('active', custColorTarget === 'secondary');
     if ($('cust-color-help')) {
       $('cust-color-help').textContent = custColorTarget === 'primary'
-        ? 'COULEUR 1 : applique la couleur principale aux grosses pièces du robot.'
-        : 'COULEUR 2 : applique la couleur des accents et éléments lumineux.';
+        ? 'COULEUR 1 : applique la couleur principale aux grosses pieces du robot.'
+        : 'COULEUR 2 : applique la couleur des accents et elements lumineux.';
     }
     renderColorSwatches();
   }
+
+  // ── GLB Export (depuis menu principal) ────────
 
   function exportGLBFromMenu() {
     initMaterials(); // peuple MAT si pas encore initialisé
