@@ -245,11 +245,17 @@
     #hp-label-enemy { color:rgba(255,68,34,0.55); text-align:center; }
 
     /* ── Mode paysage ── */
-    body.ls #hp-enemy-wrap {
-      top:50%; left:auto; right:130px; transform:translateY(-50%);
-      flex-direction:column; align-items:center; width:auto; gap:4px; }
+    /* Joystick → bas-gauche (position 4) */
+    body.ls #joystick-zone { bottom:24px; right:auto; left:24px; }
+    /* Bouton attaque → haut-gauche (position 1) */
+    body.ls #btn-attack { bottom:auto; top:24px; left:24px; }
+    /* Ma barre de vie → côté gauche entre 1 et 4 */
     body.ls #hp-me-wrap {
-      bottom:auto; top:50%; left:130px; right:auto; transform:translateY(-50%);
+      bottom:auto; top:50%; left:16px; right:auto; transform:translateY(-50%);
+      flex-direction:column; align-items:center; width:auto; gap:4px; }
+    /* Barre vie adversaire → côté droit */
+    body.ls #hp-enemy-wrap {
+      top:50%; left:auto; right:110px; transform:translateY(-50%);
       flex-direction:column; align-items:center; width:auto; gap:4px; }
     body.ls .hp-bg {
       height:clamp(100px,30vh,160px); width:8px; border-radius:3px; }
@@ -257,10 +263,13 @@
       position:absolute; bottom:0; left:0; width:100% !important;
       border-radius:3px; transition:height .25s ease-out; }
     body.ls .hp-label { writing-mode:vertical-rl; font-size:8px; letter-spacing:.1em; }
+    /* Autres boutons → côté droit entre 2 et 3 */
     body.ls #game-controls {
-      top:8px; right:auto; left:50%; transform:translateX(-50%);
-      flex-direction:row; gap:10px; }
-    body.ls #btn-landscape { top:8px; }
+      top:50%; right:16px; left:auto; transform:translateY(-50%);
+      flex-direction:column; gap:8px; align-items:flex-end; }
+    /* Bouton paysage → haut-centre */
+    body.ls #btn-landscape {
+      top:8px; left:50%; right:auto; transform:translateX(-50%); }
   </style>
 </head>
 <body>
@@ -310,7 +319,7 @@
   </div>
 
   <button id="btn-landscape">↺ PAYSAGE</button>
-  <button id="btn-attack">⚔</button>
+  <button id="btn-attack"></button>
 
   <!-- HP bars -->
   <div id="hp-enemy-wrap">
@@ -1418,7 +1427,7 @@
     CAM_FIXED.z = 3.6 * camSide;
     robotPos.x = 0;
     robotPos.z = 2.5 * camSide;
-    robotPos.ry = isCreator ? Math.PI : 0;
+    robotPos.ry = Math.PI;
     camYaw = isCreator ? 0 : Math.PI;
     myMaxHP = calcMaxHP();
     myHP = myMaxHP;
@@ -1483,13 +1492,13 @@
         * PIECES.body.options[PIECES.body.current].speed;
 
       if (landscapeMode && jLen > 0.05) {
-        // Mode paysage — contrôles tank :
-        // vers le haut du téléphone (= gauche écran = move.x négatif) → tourne à gauche (+ry)
-        robotPos.ry += (-move.x) * ROT_SPEED * 2.0;
-        // avant/arrière : vers le haut de l'écran (move.z négatif) = avancer
-        if (Math.abs(move.z) > 0.05) {
-          robotPos.x += Math.sin(robotPos.ry) * (-move.z) * effSpeed;
-          robotPos.z += Math.cos(robotPos.ry) * (-move.z) * effSpeed;
+        // Mode paysage — contrôles tank (téléphone tourné 90° CW) :
+        // move.z (portrait haut/bas) = gauche/droite physique → rotation
+        robotPos.ry += (-move.z) * ROT_SPEED * 2.0;
+        // move.x (portrait gauche/droite) = haut/bas physique → avancer/reculer
+        if (Math.abs(move.x) > 0.05) {
+          robotPos.x += Math.sin(robotPos.ry) * move.x * effSpeed;
+          robotPos.z += Math.cos(robotPos.ry) * move.x * effSpeed;
         }
       } else if (move.rotY !== 0) {
         // Boutons ROT : rotation manuelle sans déplacement
