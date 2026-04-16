@@ -248,7 +248,7 @@
     /* Joystick → bas-gauche (position 4) */
     body.ls #joystick-zone { bottom:24px; right:auto; left:24px; }
     /* Bouton attaque → haut-gauche (position 1) */
-    body.ls #btn-attack { bottom:auto; top:24px; left:24px; }
+    body.ls #btn-attack { bottom:auto; top:56px; left:16px; }
     /* Ma barre de vie → côté gauche entre 1 et 4 */
     body.ls #hp-me-wrap {
       bottom:auto; top:50%; left:16px; right:auto; transform:translateY(-50%);
@@ -1492,14 +1492,17 @@
         * PIECES.body.options[PIECES.body.current].speed;
 
       if (landscapeMode && jLen > 0.05) {
-        // Mode paysage — contrôles tank (téléphone tourné 90° CW) :
-        // move.z (portrait haut/bas) = gauche/droite physique → rotation
-        robotPos.ry += (-move.z) * ROT_SPEED * 2.0;
-        // move.x (portrait gauche/droite) = haut/bas physique → avancer/reculer
-        if (Math.abs(move.x) > 0.05) {
-          robotPos.x += Math.sin(robotPos.ry) * move.x * effSpeed;
-          robotPos.z += Math.cos(robotPos.ry) * move.x * effSpeed;
-        }
+        // Mode paysage : même logique qu'en portrait, axes pivotés 90°
+        // le haut (move.z négatif) devient la gauche, la droite devient l'avant
+        const lx = move.z;   // portrait haut/bas  → paysage gauche/droite
+        const lz = -move.x;  // portrait gauche/droite → paysage avant/arrière
+        const wx = Math.cos(camYaw)*lx + Math.sin(camYaw)*lz;
+        const wz = -Math.sin(camYaw)*lx + Math.cos(camYaw)*lz;
+        robotPos.x += wx * effSpeed;
+        robotPos.z += wz * effSpeed;
+        const targetRy = Math.atan2(wx, wz);
+        const da = Math.atan2(Math.sin(targetRy - robotPos.ry), Math.cos(targetRy - robotPos.ry));
+        robotPos.ry += da * ROT_SMOOTH;
       } else if (move.rotY !== 0) {
         // Boutons ROT : rotation manuelle sans déplacement
         robotPos.ry += move.rotY * ROT_SPEED;
