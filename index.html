@@ -159,6 +159,27 @@
     #cust-stats { width:100%; display:flex; flex-direction:column; gap:7px;
       background:rgba(3,10,18,0.72); border:1px solid rgba(0,245,255,0.12); border-radius:18px;
       padding:14px 14px 12px; backdrop-filter:blur(12px); }
+    #cust-progression { width:100%; display:flex; flex-direction:column; gap:10px;
+      background:rgba(3,10,18,0.72); border:1px solid rgba(255,190,90,0.16); border-radius:18px;
+      padding:14px; backdrop-filter:blur(12px); }
+    .cust-panel-title { font-family:var(--font-mono); font-size:10px; letter-spacing:.16em; color:rgba(255,190,90,0.78); }
+    .cust-meta-line { display:flex; align-items:center; justify-content:space-between; gap:10px;
+      font-family:var(--font-mono); font-size:10px; color:rgba(220,240,255,0.7); }
+    .cust-meta-value { color:var(--cyan); }
+    .cust-build-input { width:100%; margin-top:2px; padding:10px 12px; border-radius:12px;
+      border:1px solid rgba(0,245,255,0.16); background:rgba(5,12,20,0.76); color:var(--text);
+      font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; outline:none; }
+    .cust-build-input::placeholder { color:rgba(200,230,255,0.3); }
+    .cust-presets { display:flex; flex-direction:column; gap:8px; }
+    .cust-preset-row { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; }
+    .cust-preset-name { min-height:36px; padding:9px 12px; border-radius:12px; border:1px solid rgba(0,245,255,0.12);
+      background:rgba(5,12,20,0.5); font-family:var(--font-mono); font-size:10px; color:rgba(220,240,255,0.72);
+      display:flex; align-items:center; }
+    .cust-mini-btn { min-width:68px; padding:9px 10px; border-radius:12px; cursor:pointer;
+      border:1px solid rgba(0,245,255,0.18); background:rgba(5,12,20,0.7); color:var(--cyan);
+      font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; }
+    .cust-mini-btn.warm { border-color:rgba(255,190,90,0.2); color:#ffcf86; }
+    #cust-unlock-line { font-family:var(--font-mono); font-size:9px; letter-spacing:.08em; color:rgba(220,240,255,0.45); line-height:1.5; }
     .cust-stat-row { display:flex; align-items:center; gap:8px; }
     .cust-stat-label { font-family:var(--font-mono); font-size:9px;
       color:rgba(0,245,255,0.4); letter-spacing:.12em; width:62px; flex-shrink:0; }
@@ -188,6 +209,9 @@
     #cust-piece-name { margin-top:4px; font-family:var(--font-mono); font-size:13px; color:var(--cyan); }
     #cust-piece-stats { margin-top:4px; font-size:10px; color:rgba(220,240,255,0.55); }
     #cust-piece-style { margin-top:5px; font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; color:rgba(255,185,90,0.78); }
+    #cust-piece-lock { margin-top:6px; font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; color:rgba(255,110,80,0.82); }
+    .cust-rarity { display:inline-block; margin-left:8px; padding:2px 7px; border-radius:999px; border:1px solid rgba(255,190,90,0.2);
+      color:#ffd28d; font-size:8px; letter-spacing:.14em; vertical-align:middle; }
     @media (max-width: 720px) {
       #cust-topbar { flex-direction:column; align-items:stretch; }
       #cust-right-ui { width:100%; }
@@ -370,6 +394,13 @@
                 <div class="cust-pips" id="stat-rate"></div>
               </div>
             </div>
+            <div id="cust-progression">
+              <div class="cust-panel-title">PROGRESSION</div>
+              <div class="cust-meta-line"><span>VICTOIRES</span><span class="cust-meta-value" id="cust-wins">0</span></div>
+              <input id="cust-build-name" class="cust-build-input" type="text" maxlength="22" placeholder="NOM DU BUILD"/>
+              <div class="cust-presets" id="cust-presets"></div>
+              <div id="cust-unlock-line"></div>
+            </div>
           </div>
         </div>
         <div id="cust-piece-chip" class="hidden">
@@ -377,6 +408,7 @@
           <div id="cust-piece-name"></div>
           <div id="cust-piece-stats"></div>
           <div id="cust-piece-style"></div>
+          <div id="cust-piece-lock"></div>
         </div>
         <div id="cust-arrows" class="hidden">
           <button class="cust-arrow" id="cust-arrow-prev" type="button"><</button>
@@ -482,26 +514,33 @@
   ];
 
   // Couleurs du robot : couleur 1 = base principale, couleur 2 = accents
-  const ROBOT_CONFIG_KEY = 'robotar_config_v2';
+  const ROBOT_CONFIG_KEY = 'robotar_config_v3';
+  const ROBOT_PROGRESS_KEY = 'robotar_progress_v1';
+  const ROBOT_PRESETS_KEY = 'robotar_presets_v1';
   const PIECE_ORDER = ['wheels', 'rims', 'chassis', 'body', 'front', 'antenna'];
   const STYLE_PRESETS = [
-    { id:'steel',   name:'Acier brut',  hex:'#5f7b92', base:0x5f7b92, accent:0xd8edf9, emissive:0x10202e, pattern:'solid' },
-    { id:'ember',   name:'Braise',      hex:'#ff6f4d', base:0xff6f4d, accent:0xffd26a, emissive:0x3d130b, pattern:'solid' },
-    { id:'toxic',   name:'Toxique',     hex:'#7bff6c', base:0x7bff6c, accent:0xd9ff88, emissive:0x10320f, pattern:'stripe' },
-    { id:'royal',   name:'Royal',       hex:'#7e84ff', base:0x7e84ff, accent:0xd0d9ff, emissive:0x181c40, pattern:'solid' },
-    { id:'hazard',  name:'Hazard',      hex:'#ffbf2f', base:0xffbf2f, accent:0x1f2228, emissive:0x3a2904, pattern:'hazard' },
-    { id:'digital', name:'Digital',     hex:'#00d5d0', base:0x00d5d0, accent:0xb9fff7, emissive:0x062b2d, pattern:'digital' },
-    { id:'carbon',  name:'Carbone',     hex:'#8d97a3', base:0x8d97a3, accent:0xe9edf2, emissive:0x171a1f, pattern:'carbon' },
+    { id:'steel',   name:'Acier brut',  hex:'#5f7b92', base:0x5f7b92, accent:0xd8edf9, emissive:0x10202e, pattern:'solid', rarity:'COMMUN', unlockWins:0 },
+    { id:'ember',   name:'Braise',      hex:'#ff6f4d', base:0xff6f4d, accent:0xffd26a, emissive:0x3d130b, pattern:'solid', rarity:'COMMUN', unlockWins:0 },
+    { id:'toxic',   name:'Toxique',     hex:'#7bff6c', base:0x7bff6c, accent:0xd9ff88, emissive:0x10320f, pattern:'stripe', rarity:'COMMUN', unlockWins:0 },
+    { id:'royal',   name:'Royal',       hex:'#7e84ff', base:0x7e84ff, accent:0xd0d9ff, emissive:0x181c40, pattern:'solid', rarity:'RARE', unlockWins:2 },
+    { id:'hazard',  name:'Hazard',      hex:'#ffbf2f', base:0xffbf2f, accent:0x1f2228, emissive:0x3a2904, pattern:'hazard', rarity:'RARE', unlockWins:3 },
+    { id:'digital', name:'Digital',     hex:'#00d5d0', base:0x00d5d0, accent:0xb9fff7, emissive:0x062b2d, pattern:'digital', rarity:'RARE', unlockWins:4 },
+    { id:'carbon',  name:'Carbone',     hex:'#8d97a3', base:0x8d97a3, accent:0xe9edf2, emissive:0x171a1f, pattern:'carbon', rarity:'RARE', unlockWins:5 },
+    { id:'aurora',  name:'Aurore',      hex:'#61ffd2', base:0x61ffd2, accent:0xff8ff3, emissive:0x082b24, pattern:'digital', rarity:'EPIC', unlockWins:8 },
+    { id:'regal',   name:'Régalia',     hex:'#ffd66e', base:0xffd66e, accent:0x7c4dff, emissive:0x342307, pattern:'hazard', rarity:'LEGENDE', unlockWins:12 },
   ];
   const DEFAULT_PIECE_STYLES = {
-    wheels: 'carbon',
+    wheels: 'steel',
     rims: 'ember',
-    chassis: 'hazard',
+    chassis: 'steel',
     body: 'steel',
-    front: 'digital',
-    antenna: 'royal',
+    front: 'ember',
+    antenna: 'toxic',
   };
   let pieceStyles = { ...DEFAULT_PIECE_STYLES };
+  let buildName = 'PROTO-01';
+  let progression = { wins: 0 };
+  let savedPresets = [null, null, null];
 
   function copyInvite() {
     const ov = document.createElement('div');
@@ -669,6 +708,7 @@
           name: 'Petites roues',
           icon: '⚙️',
           stats: 'Vitesse +++ / Résistance +',
+          unlockWins: 0,
           speed: 1.35, armor: 0.72,
           build(positions) {
             const group = new THREE.Group();
@@ -691,6 +731,7 @@
           name: 'Grosses roues',
           icon: '🛞',
           stats: 'Vitesse + / Résistance +++',
+          unlockWins: 1,
           speed: 0.9, armor: 1.22,
           build(positions) {
             const group = new THREE.Group();
@@ -727,6 +768,7 @@
           name: 'Chenilles',
           icon: '▤',
           stats: 'Vitesse ++ / Résistance ++',
+          unlockWins: 2,
           speed: 1.02, armor: 1.08,
           build() {
             const group = new THREE.Group();
@@ -755,6 +797,7 @@
           name: 'Roues omni',
           icon: '✺',
           stats: 'Vitesse ++ / Résistance +',
+          unlockWins: 5,
           speed: 1.18, armor: 0.92,
           build(positions) {
             const group = new THREE.Group();
@@ -790,6 +833,7 @@
           name: 'Turbine',
           icon: '✹',
           stats: 'Relance ++ / Contrôle ++',
+          unlockWins: 0,
           speed: 1.04, armor: 1.0,
           build() {
             const group = new THREE.Group();
@@ -818,6 +862,7 @@
           name: 'Blindées',
           icon: '⬢',
           stats: 'Résistance ++ / Relance +',
+          unlockWins: 2,
           speed: 0.96, armor: 1.06,
           build() {
             const group = new THREE.Group();
@@ -845,6 +890,7 @@
           name: 'Halo',
           icon: '◎',
           stats: 'Relance + / Style ++',
+          unlockWins: 4,
           speed: 1.02, armor: 0.98,
           build() {
             const group = new THREE.Group();
@@ -879,6 +925,7 @@
           name: 'Rail',
           icon: '═',
           stats: 'Vitesse ++ / Résistance +',
+          unlockWins: 0,
           speed: 1.06, armor: 0.98,
           build() {
             const group = new THREE.Group();
@@ -901,6 +948,7 @@
           name: 'Araignée',
           icon: '✣',
           stats: 'Vitesse + / Résistance ++',
+          unlockWins: 2,
           speed: 0.97, armor: 1.1,
           build() {
             const group = new THREE.Group();
@@ -924,6 +972,7 @@
           name: 'Réacteur',
           icon: '⬣',
           stats: 'Résistance ++ / Energie ++',
+          unlockWins: 6,
           speed: 1.0, armor: 1.08,
           build() {
             const group = new THREE.Group();
@@ -954,6 +1003,7 @@
           name: 'Corps pavé',
           icon: '⬛',
           stats: 'Résistance +++ / Vitesse +',
+          unlockWins: 0,
           speed: 0.88, armor: 1.24,
           build() {
             const group = new THREE.Group();
@@ -976,6 +1026,7 @@
           name: 'Corps arrondi',
           icon: '🔵',
           stats: 'Vitesse ++ / Résistance ++',
+          unlockWins: 1,
           speed: 1.14, armor: 0.98,
           build() {
             const group = new THREE.Group();
@@ -1000,6 +1051,7 @@
           name: 'Corps pointe',
           icon: '▲',
           stats: 'Vitesse ++ / Résistance ++',
+          unlockWins: 3,
           speed: 1.0, armor: 1.12,
           build() {
             const group = new THREE.Group();
@@ -1024,6 +1076,7 @@
           name: 'Corps bunker',
           icon: '▣',
           stats: 'Résistance +++ / Vitesse +',
+          unlockWins: 7,
           speed: 0.82, armor: 1.32,
           build() {
             const group = new THREE.Group();
@@ -1056,6 +1109,7 @@
           name: 'Pelle',
           icon: '🔨',
           stats: 'Attaque zone / Poids ++',
+          unlockWins: 0,
           attack: 1.3, weight: 1.3, cooldownMs: 1250, collisionBias: 1.16,
           build() {
             const group = new THREE.Group();
@@ -1081,6 +1135,7 @@
           name: 'Pic',
           icon: '⚡',
           stats: 'Attaque perçage / Poids +',
+          unlockWins: 1,
           attack: 0.95, weight: 0.82, cooldownMs: 780, collisionBias: 1.28,
           build() {
             const group = new THREE.Group();
@@ -1108,6 +1163,7 @@
           name: 'Scie',
           icon: '◐',
           stats: 'Attaque ++ / Cadence ++',
+          unlockWins: 3,
           attack: 1.12, weight: 1.0, cooldownMs: 980, collisionBias: 1.02,
           build() {
             const group = new THREE.Group();
@@ -1132,6 +1188,7 @@
           name: 'Marteau',
           icon: '⬟',
           stats: 'Attaque +++ / Cadence +',
+          unlockWins: 5,
           attack: 1.34, weight: 1.14, cooldownMs: 1160, stunMs: 700, collisionBias: 1.1,
           build() {
             const group = new THREE.Group();
@@ -1159,6 +1216,7 @@
           name: 'Mine ventouse',
           icon: '✹',
           stats: 'Mine explosive / Zone',
+          unlockWins: 7,
           attack: 1.02, weight: 0.92, cooldownMs: 1500, mode: 'deployMine',
           hazardDamage: 24, hazardRadius: 0.42, armDelayMs: 550, hazardLifeMs: 14000, deployLimit: 3, stunMs: 260,
           build() {
@@ -1187,6 +1245,7 @@
           name: 'Piège de stase',
           icon: '⌬',
           stats: 'Piège / Stun',
+          unlockWins: 9,
           attack: 0.62, weight: 0.9, cooldownMs: 1680, mode: 'deployTrap',
           hazardDamage: 10, hazardRadius: 0.5, armDelayMs: 420, hazardLifeMs: 12000, deployLimit: 2, stunMs: 1200,
           build() {
@@ -1221,6 +1280,7 @@
           name: 'Antenne boost',
           icon: '⚡',
           stats: 'Special : dash x3 / Recharge 10s',
+          unlockWins: 0,
           cooldownMs: 10000,
           abilityLabel: 'DASH',
           build() {
@@ -1259,6 +1319,7 @@
           name: 'Antenne téléportation',
           icon: '✦',
           stats: 'Special : téléportation / Recharge 15s',
+          unlockWins: 4,
           cooldownMs: 15000,
           abilityLabel: 'TP',
           build() {
@@ -1285,6 +1346,7 @@
           name: 'Antenne invisibilité',
           icon: '◌',
           stats: 'Special : invisible 2s / Recharge 10s',
+          unlockWins: 8,
           cooldownMs: 10000,
           abilityLabel: 'HIDE',
           build() {
@@ -1302,6 +1364,7 @@
           name: 'Antenne bouclier',
           icon: '◍',
           stats: 'Special : bouclier 3s / Recharge 12s',
+          unlockWins: 6,
           cooldownMs: 12000,
           abilityLabel: 'SHLD',
           build() {
@@ -1386,6 +1449,121 @@
     });
   }
 
+  function getWins() {
+    return progression?.wins || 0;
+  }
+
+  function isStyleUnlocked(styleId) {
+    const style = STYLE_PRESETS.find(s => s.id === styleId);
+    return !!style && getWins() >= (style.unlockWins || 0);
+  }
+
+  function isPieceUnlocked(pieceType, key) {
+    const opt = PIECES[pieceType]?.options?.[key];
+    return !!opt && getWins() >= (opt.unlockWins || 0);
+  }
+
+  function getUnlockedStylePresets() {
+    return STYLE_PRESETS.filter(style => isStyleUnlocked(style.id));
+  }
+
+  function getUnlockedPieceKeys(pieceType) {
+    return Object.keys(PIECES[pieceType]?.options || {}).filter(key => isPieceUnlocked(pieceType, key));
+  }
+
+  function getNextUnlockLabel() {
+    const wins = getWins();
+    const candidates = [];
+    STYLE_PRESETS.forEach(style => {
+      if ((style.unlockWins || 0) > wins) candidates.push({ wins: style.unlockWins, label: `SKIN ${style.name}` });
+    });
+    PIECE_ORDER.forEach(pieceType => {
+      Object.entries(PIECES[pieceType]?.options || {}).forEach(([, opt]) => {
+        if ((opt.unlockWins || 0) > wins) candidates.push({ wins: opt.unlockWins, label: `${PIECES[pieceType].label} ${opt.name}` });
+      });
+    });
+    candidates.sort((a, b) => a.wins - b.wins);
+    if (!candidates.length) return 'TOUT EST DEBLOQUE';
+    return `PROCHAIN : ${candidates[0].label} A ${candidates[0].wins} VICTOIRES`;
+  }
+
+  function getNewUnlocks(fromWins, toWins) {
+    const found = [];
+    STYLE_PRESETS.forEach(style => {
+      if ((style.unlockWins || 0) > fromWins && (style.unlockWins || 0) <= toWins) {
+        found.push(`Skin ${style.name}`);
+      }
+    });
+    PIECE_ORDER.forEach(pieceType => {
+      Object.values(PIECES[pieceType]?.options || {}).forEach(opt => {
+        if ((opt.unlockWins || 0) > fromWins && (opt.unlockWins || 0) <= toWins) {
+          found.push(`${PIECES[pieceType].label} ${opt.name}`);
+        }
+      });
+    });
+    return found;
+  }
+
+  function normalizeBuildName(value) {
+    const cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+    return cleaned || 'PROTO-01';
+  }
+
+  function sanitizeCustomizationUnlocks() {
+    PIECE_ORDER.forEach(pieceType => {
+      const unlocked = getUnlockedPieceKeys(pieceType);
+      if (!unlocked.length) return;
+      if (!unlocked.includes(PIECES[pieceType].current)) PIECES[pieceType].current = unlocked[0];
+      if (!isStyleUnlocked(pieceStyles[pieceType])) pieceStyles[pieceType] = DEFAULT_PIECE_STYLES[pieceType];
+      if (!isStyleUnlocked(pieceStyles[pieceType])) pieceStyles[pieceType] = getUnlockedStylePresets()[0]?.id || STYLE_PRESETS[0].id;
+    });
+  }
+
+  function snapshotCurrentBuild() {
+    return {
+      name: normalizeBuildName(buildName),
+      wheels: PIECES.wheels.current,
+      rims: PIECES.rims.current,
+      chassis: PIECES.chassis.current,
+      body: PIECES.body.current,
+      front: PIECES.front.current,
+      antenna: PIECES.antenna.current,
+      styles: { ...pieceStyles }
+    };
+  }
+
+  function saveProgression() {
+    try {
+      localStorage.setItem(ROBOT_PROGRESS_KEY, JSON.stringify(progression));
+    } catch (_) {}
+  }
+
+  function loadProgression() {
+    try {
+      const raw = localStorage.getItem(ROBOT_PROGRESS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      progression = { wins: Math.max(0, parsed?.wins || 0) };
+    } catch (_) {}
+  }
+
+  function savePresets() {
+    try {
+      localStorage.setItem(ROBOT_PRESETS_KEY, JSON.stringify(savedPresets));
+    } catch (_) {}
+  }
+
+  function loadPresets() {
+    try {
+      const raw = localStorage.getItem(ROBOT_PRESETS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        savedPresets = [parsed[0] || null, parsed[1] || null, parsed[2] || null];
+      }
+    } catch (_) {}
+  }
+
   function saveRobotConfig() {
     try {
       localStorage.setItem(ROBOT_CONFIG_KEY, JSON.stringify({
@@ -1395,7 +1573,8 @@
         body: PIECES.body.current,
         front: PIECES.front.current,
         antenna: PIECES.antenna.current,
-        styles: pieceStyles
+        styles: pieceStyles,
+        buildName: normalizeBuildName(buildName)
       }));
     } catch (_) {}
   }
@@ -1411,6 +1590,7 @@
       if (cfg.body && PIECES.body.options[cfg.body]) PIECES.body.current = cfg.body;
       if (cfg.front && PIECES.front.options[cfg.front]) PIECES.front.current = cfg.front;
       if (cfg.antenna && PIECES.antenna.options[cfg.antenna]) PIECES.antenna.current = cfg.antenna;
+      if (cfg.buildName) buildName = normalizeBuildName(cfg.buildName);
       if (cfg.styles && typeof cfg.styles === 'object') {
         PIECE_ORDER.forEach(pieceType => {
           if (cfg.styles[pieceType] && STYLE_PRESETS.some(p => p.id === cfg.styles[pieceType])) {
@@ -1421,7 +1601,10 @@
     } catch (_) {}
   }
 
+  loadProgression();
+  loadPresets();
   loadRobotConfig();
+  sanitizeCustomizationUnlocks();
 
   // Positions des roues (réutilisées par les deux variantes)
   const WHEEL_POSITIONS = [[-0.17,0.07,0.11],[0.17,0.07,0.11],[-0.17,0.07,-0.11],[0.17,0.07,-0.11]];
@@ -2497,6 +2680,15 @@
   function endGame(won) {
     if (gameOver) return;
     gameOver = true;
+    const prevWins = getWins();
+    let newUnlocks = [];
+    if (won) {
+      progression.wins = prevWins + 1;
+      saveProgression();
+      newUnlocks = getNewUnlocks(prevWins, progression.wins);
+      sanitizeCustomizationUnlocks();
+      saveRobotConfig();
+    }
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;' +
       'align-items:center;justify-content:center;background:rgba(5,8,16,0.95);gap:24px;';
@@ -2505,6 +2697,10 @@
       <div style="font-family:'Share Tech Mono',monospace;font-size:clamp(24px,7vw,38px);
         color:${col};text-shadow:0 0 30px ${col};letter-spacing:.15em;text-align:center;">
         ${won ? '[ VICTOIRE ]' : '[ DÉFAITE ]'}
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(220,240,255,0.65);letter-spacing:.12em;text-align:center;max-width:340px;line-height:1.7;">
+        ${won ? `VICTOIRES TOTALES : ${progression.wins}` : `VICTOIRES TOTALES : ${getWins()}`}
+        ${won && newUnlocks.length ? `<br>DEBLOQUE : ${newUnlocks.slice(0, 3).join(' • ')}` : ''}
       </div>
       <button onclick="location.reload()" style="font-family:'Share Tech Mono',monospace;
         font-size:13px;color:#0a0a0f;background:#00f5ff;border:none;padding:13px 36px;
@@ -3052,7 +3248,7 @@
   }
 
   function getCustOptionKeys(pieceType) {
-    return Object.keys(PIECES[pieceType]?.options || {});
+    return getUnlockedPieceKeys(pieceType);
   }
 
   function getCustCurrentOption(pieceType) {
@@ -3060,12 +3256,14 @@
   }
 
   function getCustCurrentStyle(pieceType) {
-    return getStylePreset(pieceStyles[pieceType]);
+    const current = isStyleUnlocked(pieceStyles[pieceType]) ? pieceStyles[pieceType] : (getUnlockedStylePresets()[0]?.id || STYLE_PRESETS[0].id);
+    return getStylePreset(current);
   }
 
   function updateCustSelectionUI() {
     const arrows = $('cust-arrows');
     const chip = $('cust-piece-chip');
+    const lock = $('cust-piece-lock');
     if (!custSelectedPiece) {
       arrows?.classList.add('hidden');
       chip?.classList.add('hidden');
@@ -3074,21 +3272,90 @@
     }
     const def = getCustCurrentOption(custSelectedPiece);
     const style = getCustCurrentStyle(custSelectedPiece);
+    const allCount = Object.keys(PIECES[custSelectedPiece]?.options || {}).length;
+    const unlockedCount = getCustOptionKeys(custSelectedPiece).length;
+    const nextPieceUnlock = Object.values(PIECES[custSelectedPiece]?.options || {})
+      .filter(opt => (opt.unlockWins || 0) > getWins())
+      .sort((a, b) => (a.unlockWins || 0) - (b.unlockWins || 0))[0];
     if ($('cust-piece-type')) $('cust-piece-type').textContent = PIECES[custSelectedPiece].label;
-    if ($('cust-piece-name')) $('cust-piece-name').textContent = def.name;
+    if ($('cust-piece-name')) $('cust-piece-name').innerHTML = `${def.name}${style.rarity && style.unlockWins > 0 ? `<span class="cust-rarity">${style.rarity}</span>` : ''}`;
     if ($('cust-piece-stats')) $('cust-piece-stats').textContent = def.stats;
-    if ($('cust-piece-style')) $('cust-piece-style').textContent = 'STYLE : ' + style.name;
+    if ($('cust-piece-style')) $('cust-piece-style').textContent = 'STYLE : ' + style.name + (style.unlockWins > 0 ? ` • ${style.rarity}` : '');
+    if (lock) {
+      if (unlockedCount < allCount && nextPieceUnlock) lock.textContent = `${allCount - unlockedCount} VARIANTE(S) BLOQUEE(S) • PROCHAINE A ${nextPieceUnlock.unlockWins} VICTOIRES`;
+      else lock.textContent = '';
+    }
     arrows?.classList.remove('hidden');
     chip?.classList.remove('hidden');
     $('cust-hint').textContent = 'HORIZONTAL : PIECE  |  VERTICAL : STYLE  |  TAP AILLEURS : VALIDER';
   }
 
+  function updateCustProgressUI() {
+    if ($('cust-wins')) $('cust-wins').textContent = String(getWins());
+    if ($('cust-build-name') && $('cust-build-name') !== document.activeElement) $('cust-build-name').value = normalizeBuildName(buildName);
+    if ($('cust-unlock-line')) $('cust-unlock-line').textContent = getNextUnlockLabel();
+    const host = $('cust-presets');
+    if (!host) return;
+    host.innerHTML = '';
+    savedPresets.forEach((preset, index) => {
+      const row = document.createElement('div');
+      row.className = 'cust-preset-row';
+      const label = document.createElement('div');
+      label.className = 'cust-preset-name';
+      label.textContent = preset ? `${index + 1}. ${preset.name}` : `${index + 1}. VIDE`;
+      const loadBtn = document.createElement('button');
+      loadBtn.type = 'button';
+      loadBtn.className = 'cust-mini-btn';
+      loadBtn.textContent = 'CHARGER';
+      loadBtn.disabled = !preset;
+      loadBtn.style.opacity = preset ? '1' : '0.45';
+      loadBtn.addEventListener('click', () => loadPresetSlot(index));
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'cust-mini-btn warm';
+      saveBtn.textContent = 'SAUVER';
+      saveBtn.addEventListener('click', () => savePresetSlot(index));
+      row.append(label, loadBtn, saveBtn);
+      host.appendChild(row);
+    });
+  }
+
+  function savePresetSlot(index) {
+    savedPresets[index] = snapshotCurrentBuild();
+    savePresets();
+    updateCustProgressUI();
+  }
+
+  function loadPresetSlot(index) {
+    const preset = savedPresets[index];
+    if (!preset) return;
+    PIECE_ORDER.forEach(pieceType => {
+      const val = preset[pieceType];
+      if (val && PIECES[pieceType]?.options?.[val] && isPieceUnlocked(pieceType, val)) PIECES[pieceType].current = val;
+    });
+    PIECE_ORDER.forEach(pieceType => {
+      const styleId = preset.styles?.[pieceType];
+      if (styleId && STYLE_PRESETS.some(style => style.id === styleId) && isStyleUnlocked(styleId)) {
+        pieceStyles[pieceType] = styleId;
+      }
+    });
+    buildName = normalizeBuildName(preset.name);
+    sanitizeCustomizationUnlocks();
+    saveRobotConfig();
+    buildCustRobot();
+    updateStats();
+    updateCustSelectionUI();
+    updateCustProgressUI();
+  }
+
   function initCustomizer() {
     if (custInitialized) {
+      sanitizeCustomizationUnlocks();
       initMaterials();
       buildCustRobot();
       updateStats();
       updateCustSelectionUI();
+      updateCustProgressUI();
       startCustLoop();
       return;
     }
@@ -3156,10 +3423,12 @@
     window.addEventListener('resize', custResize);
 
     initMaterials();
+    sanitizeCustomizationUnlocks();
     buildCustRobot();
     custUpdateCamera();
     updateStats();
     updateCustSelectionUI();
+    updateCustProgressUI();
     startCustLoop();
 
     const drag = { on: false, moved: false, x0: 0, y0: 0, x: 0, y: 0, mode: null, swipeX: 0, swipeY: 0 };
@@ -3258,6 +3527,17 @@
 
     $('cust-arrow-prev').addEventListener('click', () => cycleCustPiece(-1));
     $('cust-arrow-next').addEventListener('click', () => cycleCustPiece(1));
+    $('cust-build-name').addEventListener('input', e => {
+      buildName = normalizeBuildName(e.target.value);
+      saveRobotConfig();
+      updateCustProgressUI();
+    });
+    $('cust-build-name').addEventListener('blur', e => {
+      buildName = normalizeBuildName(e.target.value);
+      e.target.value = buildName;
+      saveRobotConfig();
+      updateCustProgressUI();
+    });
   }
 
   function startCustLoop() {
@@ -3303,7 +3583,8 @@
     custSelectedPiece = pieceType;
     const keys = getCustOptionKeys(pieceType);
     custChoiceIndex = Math.max(0, keys.indexOf(PIECES[pieceType].current));
-    custStyleIndex = Math.max(0, STYLE_PRESETS.findIndex(s => s.id === pieceStyles[pieceType]));
+    const unlockedStyles = getUnlockedStylePresets();
+    custStyleIndex = Math.max(0, unlockedStyles.findIndex(s => s.id === pieceStyles[pieceType]));
     custBobActive = false;
     custBobBase = 0.15;
     buildCustRobot();
@@ -3377,11 +3658,14 @@
   function cycleCustStyle(dir) {
     if (!custSelectedPiece || custSwapping) return;
     custLastInteraction = Date.now();
-    custStyleIndex = (custStyleIndex + dir + STYLE_PRESETS.length) % STYLE_PRESETS.length;
-    pieceStyles[custSelectedPiece] = STYLE_PRESETS[custStyleIndex].id;
+    const unlockedStyles = getUnlockedStylePresets();
+    if (!unlockedStyles.length) return;
+    custStyleIndex = (custStyleIndex + dir + unlockedStyles.length) % unlockedStyles.length;
+    pieceStyles[custSelectedPiece] = unlockedStyles[custStyleIndex].id;
     saveRobotConfig();
     buildCustRobot();
     updateCustSelectionUI();
+    updateCustProgressUI();
   }
 
   function custUpdateCamera() {
