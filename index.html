@@ -945,11 +945,6 @@
             // Bandes d'accent
             const band = new THREE.Mesh(new THREE.BoxGeometry(0.30,0.01,0.02), MAT.accent.clone());
             band.position.set(0,0.14,0); band.userData.pieceType = 'body'; group.add(band);
-            // Antenne
-            const ant = new THREE.Mesh(new THREE.CylinderGeometry(.005,.005,.14,6), MAT.accent.clone());
-            ant.position.set(-0.06,0.26,-0.08); ant.userData.pieceType = 'body'; group.add(ant);
-            const antTop = new THREE.Mesh(new THREE.SphereGeometry(.016,8,8), MAT.orange.clone());
-            antTop.position.set(-0.06,0.335,-0.08); antTop.userData.pieceType = 'body'; group.add(antTop);
             return group;
           }
         },
@@ -974,11 +969,6 @@
             dome.position.set(0,0.17,0);
             dome.material = new THREE.MeshStandardMaterial({color:0x003344,metalness:.9,roughness:.1,transparent:true,opacity:.7});
             dome.userData.pieceType = 'body'; group.add(dome);
-            // Antenne fine
-            const ant = new THREE.Mesh(new THREE.CylinderGeometry(.004,.004,.1,6), MAT.accent.clone());
-            ant.position.set(0.05,0.24,-0.05); ant.userData.pieceType = 'body'; group.add(ant);
-            const antTop = new THREE.Mesh(new THREE.SphereGeometry(.012,8,8), MAT.accent.clone());
-            antTop.position.set(0.05,0.295,-0.05); antTop.userData.pieceType = 'body'; group.add(antTop);
             return group;
           }
         },
@@ -1159,26 +1149,26 @@
             group.name = 'antenna';
             group.userData.pieceType = 'antenna';
             const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.18, 8), MAT.body.clone());
-            mast.position.set(0, 0.31, -0.02);
+            mast.position.set(-0.06, 0.27, -0.08);
             mast.userData.pieceType = 'antenna';
             group.add(mast);
             const forkL = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.06, 0.014), MAT.accent.clone());
-            forkL.position.set(-0.025, 0.42, -0.02);
+            forkL.position.set(-0.085, 0.38, -0.08);
             forkL.rotation.z = 0.35;
             forkL.userData.pieceType = 'antenna';
             group.add(forkL);
             const forkR = forkL.clone();
-            forkR.position.x = 0.025;
+            forkR.position.x = -0.035;
             forkR.rotation.z = -0.35;
             forkR.userData.pieceType = 'antenna';
             group.add(forkR);
             const core = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 10), MAT.orange.clone());
-            core.position.set(0, 0.45, -0.02);
+            core.position.set(-0.06, 0.41, -0.08);
             core.userData.pieceType = 'antenna';
             group.add(core);
             [-1, 1].forEach(side => {
               const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.045, 0.012), MAT.accent.clone());
-              bolt.position.set(side * 0.04, 0.44, -0.02);
+              bolt.position.set(-0.06 + side * 0.04, 0.4, -0.08);
               bolt.rotation.z = side * 0.55;
               bolt.userData.pieceType = 'antenna';
               group.add(bolt);
@@ -1197,16 +1187,16 @@
             group.name = 'antenna';
             group.userData.pieceType = 'antenna';
             const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.16, 8), MAT.body.clone());
-            mast.position.set(0, 0.3, -0.01);
+            mast.position.set(-0.06, 0.26, -0.08);
             mast.userData.pieceType = 'antenna';
             group.add(mast);
             const orb = new THREE.Mesh(new THREE.OctahedronGeometry(0.04, 0), MAT.accent.clone());
-            orb.position.set(0, 0.43, -0.01);
+            orb.position.set(-0.06, 0.39, -0.08);
             orb.userData.pieceType = 'antenna';
             group.add(orb);
             const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.006, 6, 18), MAT.orange.clone());
             ring.rotation.x = Math.PI / 2;
-            ring.position.set(0, 0.43, -0.01);
+            ring.position.set(-0.06, 0.39, -0.08);
             ring.userData.pieceType = 'antenna';
             group.add(ring);
             return group;
@@ -1223,7 +1213,7 @@
             group.name = 'antenna';
             group.userData.pieceType = 'antenna';
             const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.032, 0), MAT.accent.clone());
-            head.position.set(0, 0.39, -0.01);
+            head.position.set(-0.06, 0.36, -0.08);
             head.userData.pieceType = 'antenna';
             group.add(head);
             return group;
@@ -1825,6 +1815,22 @@
     btn.classList.toggle('cooling', cooling);
   }
 
+  function resolveTeleportTarget(enemy, desiredDist) {
+    const margin = 0.38;
+    const ang = enemy.group.rotation.y;
+    for (let dist = desiredDist; dist >= ROBOT_RADIUS * 1.4; dist -= 0.08) {
+      const tx = enemy.lerpX - Math.sin(ang) * dist;
+      const tz = enemy.lerpZ - Math.cos(ang) * dist;
+      if (Math.abs(tx) <= ARENA - margin && Math.abs(tz) <= ARENA - margin) {
+        return { x: tx, z: tz };
+      }
+    }
+    return {
+      x: THREE.MathUtils.clamp(enemy.lerpX - Math.sin(ang) * desiredDist, -ARENA + margin, ARENA - margin),
+      z: THREE.MathUtils.clamp(enemy.lerpZ - Math.cos(ang) * desiredDist, -ARENA + margin, ARENA - margin),
+    };
+  }
+
   function spawnExplosionBurst(origin, tint = 0xff7b2f) {
     const burst = new THREE.Group();
     burst.position.copy(origin);
@@ -2000,9 +2006,9 @@
     } else if (PIECES.antenna.current === 'teleport' && enemy) {
       triggered = true;
       const dist = ROBOT_RADIUS * 4;
-      const ang = enemy.group.rotation.y;
-      robotPos.x = THREE.MathUtils.clamp(enemy.lerpX - Math.sin(ang) * dist, -ARENA + 0.35, ARENA - 0.35);
-      robotPos.z = THREE.MathUtils.clamp(enemy.lerpZ - Math.cos(ang) * dist, -ARENA + 0.35, ARENA - 0.35);
+      const target = resolveTeleportTarget(enemy, dist);
+      robotPos.x = target.x;
+      robotPos.z = target.z;
       robotPos.ry = Math.atan2(enemy.lerpX - robotPos.x, enemy.lerpZ - robotPos.z);
       spawnExplosionBurst(new THREE.Vector3(robotPos.x, 0, robotPos.z), 0x8c9dff);
       publishImmediate();
