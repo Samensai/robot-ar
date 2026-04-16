@@ -247,15 +247,15 @@
     /* ── Mode paysage ── */
     /* Joystick → bas-gauche (position 4) */
     body.ls #joystick-zone { bottom:24px; right:auto; left:24px; }
-    /* Bouton attaque → haut-gauche (position 1) */
+    /* Bouton attaque → haut-gauche (position 1), sous le HUD */
     body.ls #btn-attack { bottom:auto; top:56px; left:16px; }
     /* Ma barre de vie → côté gauche entre 1 et 4 */
     body.ls #hp-me-wrap {
       bottom:auto; top:50%; left:16px; right:auto; transform:translateY(-50%);
       flex-direction:column; align-items:center; width:auto; gap:4px; }
-    /* Barre vie adversaire → côté droit */
+    /* Barre vie adversaire → côté droit, à gauche des boutons */
     body.ls #hp-enemy-wrap {
-      top:50%; left:auto; right:110px; transform:translateY(-50%);
+      top:50%; left:auto; right:72px; transform:translateY(-50%);
       flex-direction:column; align-items:center; width:auto; gap:4px; }
     body.ls .hp-bg {
       height:clamp(100px,30vh,160px); width:8px; border-radius:3px; }
@@ -263,13 +263,16 @@
       position:absolute; bottom:0; left:0; width:100% !important;
       border-radius:3px; transition:height .25s ease-out; }
     body.ls .hp-label { writing-mode:vertical-rl; font-size:8px; letter-spacing:.1em; }
-    /* Autres boutons → côté droit entre 2 et 3 */
+    /* Boutons INVITE / QUITTER → bas-droit, pivotés 90° */
     body.ls #game-controls {
-      top:50%; right:16px; left:auto; transform:translateY(-50%);
+      bottom:24px; top:auto; right:16px; left:auto; transform:none;
       flex-direction:column; gap:8px; align-items:flex-end; }
-    /* Bouton paysage → haut-centre */
+    body.ls .ctrl-btn {
+      writing-mode:vertical-rl; transform:rotate(180deg); }
+    /* Bouton portrait/paysage → haut-droit, pivoté 90° */
     body.ls #btn-landscape {
-      top:8px; left:50%; right:auto; transform:translateX(-50%); }
+      top:56px; right:16px; left:auto; transform:rotate(180deg);
+      writing-mode:vertical-rl; }
   </style>
 </head>
 <body>
