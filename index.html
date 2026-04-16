@@ -542,6 +542,7 @@
   ];
 
   // Couleurs du robot : couleur 1 = base principale, couleur 2 = accents
+  const ROBOT_CONFIG_KEY = 'robotar_config_v1';
   let robotPrimaryColorId = 'steel';
   let robotSecondaryColorId = 'cyan';
   let custColorTarget = 'primary';
@@ -914,6 +915,33 @@
     return Math.round(w.armor * b.armor * 100);
   }
 
+  function saveRobotConfig() {
+    try {
+      localStorage.setItem(ROBOT_CONFIG_KEY, JSON.stringify({
+        wheels: PIECES.wheels.current,
+        body: PIECES.body.current,
+        front: PIECES.front.current,
+        color1: robotPrimaryColorId,
+        color2: robotSecondaryColorId
+      }));
+    } catch (_) {}
+  }
+
+  function loadRobotConfig() {
+    try {
+      const raw = localStorage.getItem(ROBOT_CONFIG_KEY);
+      if (!raw) return;
+      const cfg = JSON.parse(raw);
+      if (cfg.wheels && PIECES.wheels.options[cfg.wheels]) PIECES.wheels.current = cfg.wheels;
+      if (cfg.body && PIECES.body.options[cfg.body]) PIECES.body.current = cfg.body;
+      if (cfg.front && PIECES.front.options[cfg.front]) PIECES.front.current = cfg.front;
+      if (cfg.color1 && COLOR_PRESETS.some(p => p.id === cfg.color1)) robotPrimaryColorId = cfg.color1;
+      if (cfg.color2 && COLOR_PRESETS.some(p => p.id === cfg.color2)) robotSecondaryColorId = cfg.color2;
+    } catch (_) {}
+  }
+
+  loadRobotConfig();
+
   // Positions des roues (réutilisées par les deux variantes)
   const WHEEL_POSITIONS = [[-0.17,0.07,0.11],[0.17,0.07,0.11],[-0.17,0.07,-0.11],[0.17,0.07,-0.11]];
 
@@ -949,6 +977,7 @@
 
   function swapPiece(pieceType, optionKey) {
     PIECES[pieceType].current = optionKey;
+    saveRobotConfig();
 
     // Supprimer l'ancien groupe de cette pièce
     const old = robotGroup.getObjectByName(pieceType);
@@ -2272,6 +2301,7 @@
       custTweenTo(flyGroup.position, {y: 0.5}, 220, null);
       custTweenTo(flyGroup.scale, {x: 0.001, y: 0.001, z: 0.001}, 220, () => {
         PIECES[pieceType].current = key;
+        saveRobotConfig();
         custSelectedPiece = null;
         custSelectedGroup = null;
         buildCustRobot();
@@ -2292,6 +2322,7 @@
       });
     } else {
       PIECES[pieceType].current = key;
+      saveRobotConfig();
       custSelectedPiece = null; custSelectedGroup = null;
       buildCustRobot(); custSwapping = false; updateStats();
       $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
@@ -2338,6 +2369,7 @@
         if (custSwapping) return;
         if (custColorTarget === 'primary') robotPrimaryColorId = preset.id;
         else robotSecondaryColorId = preset.id;
+        saveRobotConfig();
         initMaterials();
         custSelectedPiece = null;
         custSelectedGroup = null;
