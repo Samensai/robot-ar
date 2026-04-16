@@ -204,7 +204,35 @@
       background:rgba(0,245,255,0.1); border:1px solid rgba(0,245,255,0.14); }
     .cust-pip.on { background:var(--cyan); border-color:var(--cyan); box-shadow:0 0 4px var(--cyan); }
     .cust-pip.on.warn { background:#ff9900; border-color:#ff9900; box-shadow:0 0 4px #ff9900; }
-    #cust-colors { width:100%; display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    #cust-colors { width:100%; display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
+    #cust-color-controls { flex:1; display:flex; flex-direction:column; gap:8px; }
+    #btn-cust-colors {
+      width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+      font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; color:var(--cyan);
+      background:rgba(0,0,0,0.45); border:1.5px solid rgba(0,245,255,0.18); border-radius:4px;
+      padding:10px 12px; cursor:pointer;
+    }
+    #cust-color-preview { display:flex; align-items:center; gap:7px; }
+    .cust-color-dot {
+      width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,0.55);
+      box-shadow:0 0 8px rgba(255,255,255,0.08);
+    }
+    #cust-color-panel {
+      background:rgba(0,0,0,0.35); border:1px solid rgba(0,245,255,0.12);
+      border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:10px;
+    }
+    #cust-color-panel.hidden { display:none; }
+    #cust-color-targets { display:flex; gap:8px; }
+    .cust-color-target {
+      flex:1; font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; color:rgba(200,230,255,0.7);
+      background:rgba(0,0,0,0.45); border:1px solid rgba(0,245,255,0.15); border-radius:4px;
+      padding:9px 10px; cursor:pointer;
+    }
+    .cust-color-target.active { color:var(--cyan); border-color:rgba(0,245,255,0.45); background:rgba(0,245,255,0.08); }
+    #cust-color-help {
+      font-family:var(--font-mono); font-size:9px; letter-spacing:.08em; color:rgba(200,230,255,0.45);
+      line-height:1.6;
+    }
     #cust-color-swatches { display:flex; gap:7px; flex:1; flex-wrap:wrap; }
     .cust-swatch { width:22px; height:22px; border-radius:50%; cursor:pointer;
       border:2px solid transparent; flex-shrink:0;
@@ -386,8 +414,24 @@
       </div>
       <!-- Couleur -->
       <div id="cust-colors">
-        <span class="cust-stat-label">COULEUR</span>
-        <div id="cust-color-swatches"></div>
+        <span class="cust-stat-label">COULEURS</span>
+        <div id="cust-color-controls">
+          <button id="btn-cust-colors" type="button">
+            <span>OUVRIR LE MENU</span>
+            <span id="cust-color-preview">
+              <span class="cust-color-dot" id="cust-color1-dot"></span>
+              <span class="cust-color-dot" id="cust-color2-dot"></span>
+            </span>
+          </button>
+          <div id="cust-color-panel" class="hidden">
+            <div id="cust-color-targets">
+              <button class="cust-color-target active" id="btn-color-primary" type="button">COULEUR 1</button>
+              <button class="cust-color-target" id="btn-color-secondary" type="button">COULEUR 2</button>
+            </div>
+            <div id="cust-color-help"></div>
+            <div id="cust-color-swatches"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -466,9 +510,13 @@
   const ATTACK_RANGE = 1.5;
   const BASE_ATTACK_DMG = 20;
 
-  // Couleur du robot (affecte MAT.accent + MAT.orange)
-  let robotColorId = 'cyan';
+  // Couleurs du robot : couleur 1 = base principale, couleur 2 = accents
+  let robotPrimaryColorId = 'steel';
+  let robotSecondaryColorId = 'cyan';
+  let custColorTarget = 'primary';
+  let custColorMenuOpen = false;
   const COLOR_PRESETS = [
+    { id:'steel',  hex:'#1a2a3a', accent:0x1a2a3a, emissive:0x08131d },
     { id:'cyan',   hex:'#00f5ff', accent:0x00f5ff, emissive:0x003344 },
     { id:'orange', hex:'#ff7733', accent:0xff7733, emissive:0x331500 },
     { id:'green',  hex:'#00ff88', accent:0x00ff88, emissive:0x003322 },
@@ -520,14 +568,40 @@
   // ── Materials (partagés) ──────────────────────
   let MAT = {};
 
+  function getColorPreset(id) {
+    return COLOR_PRESETS.find(c => c.id === id) || COLOR_PRESETS[0];
+  }
+
+  function createMaterialSet(primaryId = robotPrimaryColorId, secondaryId = robotSecondaryColorId) {
+    const primary = getColorPreset(primaryId);
+    const secondary = getColorPreset(secondaryId);
+    return {
+      body: new THREE.MeshStandardMaterial({
+        color:primary.accent, metalness:.7, roughness:.3,
+        emissive:primary.emissive, emissiveIntensity:.16
+      }),
+      accent: new THREE.MeshStandardMaterial({
+        color:secondary.accent, metalness:.9, roughness:.1,
+        emissive:secondary.emissive, emissiveIntensity:.5
+      }),
+      wheel: new THREE.MeshStandardMaterial({ color:0x111111, metalness:.3, roughness:.8 }),
+      orange: new THREE.MeshStandardMaterial({
+        color:secondary.accent, metalness:.6, roughness:.2,
+        emissive:secondary.emissive, emissiveIntensity:.4
+      }),
+      highlight: new THREE.MeshStandardMaterial({
+        color:0x00f5ff, metalness:.9, roughness:.1, emissive:0x00f5ff,
+        emissiveIntensity:.8, transparent:true, opacity:.9
+      }),
+      selected: new THREE.MeshStandardMaterial({
+        color:0xff6b2b, metalness:.9, roughness:.1, emissive:0xff6b2b,
+        emissiveIntensity:.6, transparent:true, opacity:.9
+      })
+    };
+  }
+
   function initMaterials() {
-    const col = COLOR_PRESETS.find(c => c.id === robotColorId) || COLOR_PRESETS[0];
-    MAT.body    = new THREE.MeshStandardMaterial({ color:0x1a2a3a, metalness:.7, roughness:.3 });
-    MAT.accent  = new THREE.MeshStandardMaterial({ color:col.accent, metalness:.9, roughness:.1, emissive:col.emissive, emissiveIntensity:.5 });
-    MAT.wheel   = new THREE.MeshStandardMaterial({ color:0x111111, metalness:.3, roughness:.8 });
-    MAT.orange  = new THREE.MeshStandardMaterial({ color:col.accent, metalness:.6, roughness:.2, emissive:col.emissive, emissiveIntensity:.4 });
-    MAT.highlight = new THREE.MeshStandardMaterial({ color:0x00f5ff, metalness:.9, roughness:.1, emissive:0x00f5ff, emissiveIntensity:.8, transparent:true, opacity:.9 });
-    MAT.selected  = new THREE.MeshStandardMaterial({ color:0xff6b2b, metalness:.9, roughness:.1, emissive:0xff6b2b, emissiveIntensity:.6, transparent:true, opacity:.9 });
+    MAT = createMaterialSet();
   }
 
   // ═══════════════════════════════════════════════
@@ -1085,9 +1159,11 @@
   function buildRemoteRobot(data) {
     // Sauvegarde config locale
     const prev = { wheels: PIECES.wheels.current, body: PIECES.body.current, front: PIECES.front.current };
+    const prevMat = MAT;
     PIECES.wheels.current = data.wheels || 'small';
     PIECES.body.current   = data.body   || 'square';
     PIECES.front.current  = data.front  || 'shovel';
+    MAT = createMaterialSet(data.color1 || 'steel', data.color2 || 'cyan');
 
     const group = new THREE.Group();
     const eye = new THREE.Mesh(new THREE.BoxGeometry(0.18,.025,.01), MAT.accent.clone());
@@ -1100,16 +1176,7 @@
     PIECES.wheels.current = prev.wheels;
     PIECES.body.current   = prev.body;
     PIECES.front.current  = prev.front;
-
-    // Teinte orange pour distinguer l'adversaire
-    const mBody   = new THREE.MeshStandardMaterial({ color:0x3a1505, metalness:.7, roughness:.3 });
-    const mAccent = new THREE.MeshStandardMaterial({ color:0xff4422, metalness:.9, roughness:.1, emissive:0xcc2200, emissiveIntensity:.4 });
-    group.traverse(obj => {
-      if (!obj.isMesh) return;
-      const h = obj.material?.color?.getHex?.();
-      if (h === 0x111111) return; // roues gardent leur couleur sombre
-      obj.material = (h === 0x1a2a3a) ? mBody.clone() : mAccent.clone();
-    });
+    MAT = prevMat;
 
     group.position.set(data.x || 0, 0, data.z || 0);
     group.rotation.y = data.ry || 0;
@@ -1125,6 +1192,7 @@
     const payload = {
       x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
       wheels: PIECES.wheels.current, body: PIECES.body.current, front: PIECES.front.current,
+      color1: robotPrimaryColorId, color2: robotSecondaryColorId,
       hp: myHP, maxHP: myMaxHP, ts: now
     };
     if (lastAttackPublished) {
@@ -1156,6 +1224,7 @@
           remoteRobots[id] = { group, targetX: p.x, targetZ: p.z, targetRy: p.ry,
                                lerpX: p.x, lerpZ: p.z, pushOffX: 0, pushOffZ: 0,
                                wheels: p.wheels, body: p.body, front: p.front,
+                               color1: p.color1 || 'steel', color2: p.color2 || 'cyan',
                                jumpY: 0, jumpVel: 0,
                                hp: p.hp ?? 100, maxHP: p.maxHP ?? 100, lastAtkT: 0 };
           scene.add(group);
@@ -1164,12 +1233,14 @@
           const r = remoteRobots[id];
           r.targetX = p.x; r.targetZ = p.z; r.targetRy = p.ry;
           // Reconstruire si les pièces ont changé
-          if (r.wheels !== p.wheels || r.body !== p.body || r.front !== p.front) {
+          if (r.wheels !== p.wheels || r.body !== p.body || r.front !== p.front
+              || r.color1 !== (p.color1 || 'steel') || r.color2 !== (p.color2 || 'cyan')) {
             const px = r.group.position.x, pz = r.group.position.z, pry = r.group.rotation.y;
             scene.remove(r.group);
             r.group = buildRemoteRobot(p);
             r.group.position.set(px, 0, pz); r.group.rotation.y = pry;
             r.wheels = p.wheels; r.body = p.body; r.front = p.front;
+            r.color1 = p.color1 || 'steel'; r.color2 = p.color2 || 'cyan';
             scene.add(r.group);
           }
           // Check attack hit
@@ -1258,6 +1329,7 @@
     const payload = {
       x: robotPos.x, z: robotPos.z, ry: robotPos.ry,
       wheels: PIECES.wheels.current, body: PIECES.body.current, front: PIECES.front.current,
+      color1: robotPrimaryColorId, color2: robotSecondaryColorId,
       hp: myHP, maxHP: myMaxHP, atk: { t: now, dmg }, ts: now
     };
     if (roomId) db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
@@ -1689,7 +1761,14 @@
   }
 
   function initCustomizer() {
-    if (custInitialized) { startCustLoop(); return; }
+    if (custInitialized) {
+      initMaterials();
+      buildCustRobot();
+      renderColorUI();
+      updateStats();
+      startCustLoop();
+      return;
+    }
     custInitialized = true;
 
     const canvas = $('cust-canvas');
@@ -1743,7 +1822,7 @@
     initMaterials();
     buildCustRobot();
     custUpdateCamera();
-    initColorSwatches();
+    renderColorUI();
     updateStats();
     startCustLoop();
 
@@ -1798,6 +1877,18 @@
     $('cust-swap-cancel').addEventListener('click', () => {
       $('cust-swap').classList.add('hidden');
       custDeselect();
+    });
+    $('btn-cust-colors').addEventListener('click', () => {
+      custColorMenuOpen = !custColorMenuOpen;
+      renderColorUI();
+    });
+    $('btn-color-primary').addEventListener('click', () => {
+      custColorTarget = 'primary';
+      renderColorUI();
+    });
+    $('btn-color-secondary').addEventListener('click', () => {
+      custColorTarget = 'secondary';
+      renderColorUI();
     });
   }
 
@@ -1994,19 +2085,21 @@
     }
   }
 
-  function initColorSwatches() {
+  function renderColorSwatches() {
     const container = $('cust-color-swatches');
     if (!container) return;
     container.innerHTML = '';
     COLOR_PRESETS.forEach(preset => {
       const sw = document.createElement('div');
-      sw.className = 'cust-swatch' + (preset.id === robotColorId ? ' sel' : '');
+      const selectedId = custColorTarget === 'primary' ? robotPrimaryColorId : robotSecondaryColorId;
+      sw.className = 'cust-swatch' + (preset.id === selectedId ? ' sel' : '');
       sw.style.background = preset.hex;
-      sw.style.boxShadow  = preset.id === robotColorId ? `0 0 7px ${preset.hex}` : 'none';
+      sw.style.boxShadow  = preset.id === selectedId ? `0 0 7px ${preset.hex}` : 'none';
       sw.title = preset.id;
       sw.addEventListener('click', () => {
         if (custSwapping) return;
-        robotColorId = preset.id;
+        if (custColorTarget === 'primary') robotPrimaryColorId = preset.id;
+        else robotSecondaryColorId = preset.id;
         initMaterials();
         custSelectedPiece = null;
         custSelectedGroup = null;
@@ -2014,18 +2107,32 @@
         _custTweens.length = 0;
         buildCustRobot();
         $('cust-hint').textContent = 'TAP UNE PIÈCE POUR LA MODIFIER';
-        container.querySelectorAll('.cust-swatch').forEach(s => {
-          s.classList.remove('sel');
-          s.style.boxShadow = 'none';
-        });
-        sw.classList.add('sel');
-        sw.style.boxShadow = `0 0 7px ${preset.hex}`;
+        renderColorUI();
       });
       container.appendChild(sw);
     });
   }
 
   // ── GLB Export (depuis menu principal) ────────
+  function renderColorUI() {
+    const primary = getColorPreset(robotPrimaryColorId);
+    const secondary = getColorPreset(robotSecondaryColorId);
+    const panel = $('cust-color-panel');
+    const btn = $('btn-cust-colors');
+    if (panel) panel.classList.toggle('hidden', !custColorMenuOpen);
+    if (btn && btn.firstElementChild) btn.firstElementChild.textContent = custColorMenuOpen ? 'FERMER LE MENU' : 'OUVRIR LE MENU';
+    if ($('cust-color1-dot')) $('cust-color1-dot').style.background = primary.hex;
+    if ($('cust-color2-dot')) $('cust-color2-dot').style.background = secondary.hex;
+    if ($('btn-color-primary')) $('btn-color-primary').classList.toggle('active', custColorTarget === 'primary');
+    if ($('btn-color-secondary')) $('btn-color-secondary').classList.toggle('active', custColorTarget === 'secondary');
+    if ($('cust-color-help')) {
+      $('cust-color-help').textContent = custColorTarget === 'primary'
+        ? 'COULEUR 1 : applique la couleur principale aux grosses pièces du robot.'
+        : 'COULEUR 2 : applique la couleur des accents et éléments lumineux.';
+    }
+    renderColorSwatches();
+  }
+
   function exportGLBFromMenu() {
     initMaterials(); // peuple MAT si pas encore initialisé
     function doExport() {
