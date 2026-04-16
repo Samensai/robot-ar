@@ -1,5 +1,5 @@
 // ── Change ce numéro à chaque déploiement pour forcer la mise à jour ──
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = `robot-ar-${VERSION}`;
 const ASSETS = ['/robot-ar/', '/robot-ar/index.html', '/robot-ar/manifest.json'];
 
