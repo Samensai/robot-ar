@@ -154,6 +154,30 @@
     .btn-splash-back { font-family:var(--font-mono); font-size:11px;
       color:rgba(200,230,255,0.3); background:none; border:none;
       cursor:pointer; margin-top:20px; letter-spacing:.1em; }
+    #arena-picker { width:100%; display:flex; flex-direction:column; gap:10px; margin-top:18px; }
+    .arena-card {
+      width:100%; text-align:left; padding:14px 16px; cursor:pointer; border-radius:8px;
+      border:1.5px solid rgba(0,245,255,0.14); background:rgba(0,0,0,0.32);
+      transition:border-color .15s,transform .12s,box-shadow .15s,background .15s;
+    }
+    .arena-card.active {
+      border-color:rgba(0,245,255,0.6); background:rgba(0,245,255,0.08);
+      box-shadow:0 0 18px rgba(0,245,255,0.12);
+    }
+    .arena-card:active { transform:scale(0.985); }
+    .arena-card-head {
+      display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;
+    }
+    .arena-card-name {
+      font-family:var(--font-mono); font-size:12px; letter-spacing:.14em; color:var(--cyan);
+    }
+    .arena-card-tag {
+      font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; color:rgba(200,230,255,0.38);
+      padding:3px 7px; border:1px solid rgba(200,230,255,0.12); border-radius:999px;
+    }
+    .arena-card-desc {
+      font-size:12px; line-height:1.6; color:rgba(200,230,255,0.6);
+    }
     #room-code-display { font-family:var(--font-mono); font-size:48px; letter-spacing:.45em;
       color:var(--cyan); text-shadow:0 0 30px var(--cyan),0 0 60px rgba(0,245,255,0.3);
       padding:16px 20px; border:1px solid rgba(0,245,255,0.2); border-radius:4px;
@@ -509,6 +533,13 @@
   let lastAttackPublished = null; // { t, dmg } pending publish
   const ATTACK_RANGE = 1.5;
   const BASE_ATTACK_DMG = 20;
+  let selectedArenaStyle = 'neon-grid';
+  let arenaStyle = 'neon-grid';
+  const ARENA_STYLES = [
+    { id:'neon-grid', name:'NEON GRID', tag:'SCI-FI', desc:'Arene techno sombre, lignes lumineuses et zones energetiques.' },
+    { id:'sunset-dunes', name:'SUNSET DUNES', tag:'DESERT', desc:'Plateforme chaude en pierre et sable, ambiance coucher de soleil.' },
+    { id:'ice-core', name:'ICE CORE', tag:'GLACIAL', desc:'Surface gelee cristalline, reflets froids et centre polaire.' }
+  ];
 
   // Couleurs du robot : couleur 1 = base principale, couleur 2 = accents
   let robotPrimaryColorId = 'steel';
@@ -1010,106 +1041,7 @@
   //  ARÈNE
   // ═══════════════════════════════════════════════
 
-  function buildArena() {
-    const H = ARENA, wallH = 0.8, wallT = 0.12;
-
-    // ── Sol de base ────────────────────────────────
-    const floorGroup = new THREE.Group();
-    floorGroup.name = 'ground';
-
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x050b12, metalness: 0.9, roughness: 0.3
-    });
-    const floorBase = new THREE.Mesh(new THREE.PlaneGeometry(H*2, H*2), floorMat);
-    floorBase.rotation.x = -Math.PI / 2;
-    floorBase.receiveShadow = true;
-    floorGroup.add(floorBase);
-
-    // ── Dalles (panneaux 2×2) ──────────────────────
-    const panelMat = new THREE.MeshStandardMaterial({
-      color: 0x0c1a28, metalness: 0.85, roughness: 0.2
-    });
-    for (let xi = -H; xi < H; xi += 2) {
-      for (let zi = -H; zi < H; zi += 2) {
-        const tile = new THREE.Mesh(
-          new THREE.BoxGeometry(1.90, 0.012, 1.90), panelMat.clone()
-        );
-        tile.position.set(xi + 1, 0.001, zi + 1);
-        tile.receiveShadow = true;
-        floorGroup.add(tile);
-      }
-    }
-
-    // ── Lignes de grille entre les dalles ──────────
-    const lineMat = new THREE.MeshStandardMaterial({
-      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.18
-    });
-    for (let i = -H; i <= H; i += 2) {
-      const lx = new THREE.Mesh(new THREE.BoxGeometry(H*2, 0.003, 0.05), lineMat);
-      lx.position.set(0, 0.003, i);
-      floorGroup.add(lx);
-      const lz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.003, H*2), lineMat);
-      lz.position.set(i, 0.003, 0);
-      floorGroup.add(lz);
-    }
-
-    // ── Zone créateur (sud = +Z) bleutée ───────────
-    const southMat = new THREE.MeshStandardMaterial({
-      color: 0x001833, emissive: 0x003366, emissiveIntensity: 0.45,
-      metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.65
-    });
-    const southZone = new THREE.Mesh(
-      new THREE.BoxGeometry(H*2 - 0.3, 0.007, H - 0.15), southMat
-    );
-    southZone.position.set(0, 0.002, H / 2);
-    floorGroup.add(southZone);
-
-    // ── Zone adversaire (nord = -Z) rougeâtre ──────
-    const northMat = new THREE.MeshStandardMaterial({
-      color: 0x1a0008, emissive: 0x440011, emissiveIntensity: 0.45,
-      metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.65
-    });
-    const northZone = new THREE.Mesh(
-      new THREE.BoxGeometry(H*2 - 0.3, 0.007, H - 0.15), northMat
-    );
-    northZone.position.set(0, 0.002, -H / 2);
-    floorGroup.add(northZone);
-
-    // ── Ligne de centre ────────────────────────────
-    const accentMat = new THREE.MeshStandardMaterial({
-      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.7
-    });
-    const divLine = new THREE.Mesh(
-      new THREE.BoxGeometry(H*2 - 0.2, 0.006, 0.055), accentMat
-    );
-    divLine.position.set(0, 0.004, 0);
-    floorGroup.add(divLine);
-
-    // ── Cercle central ─────────────────────────────
-    const centerRing = new THREE.Mesh(
-      new THREE.TorusGeometry(1.0, 0.022, 6, 64), accentMat.clone()
-    );
-    centerRing.rotation.x = Math.PI / 2;
-    centerRing.position.y = 0.005;
-    floorGroup.add(centerRing);
-
-    const centerDot = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.055, 0.055, 0.006, 16), accentMat.clone()
-    );
-    centerDot.position.y = 0.003;
-    floorGroup.add(centerDot);
-
-    scene.add(floorGroup);
-
-    // ── Murs ───────────────────────────────────────
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x0a1825, metalness: 0.8, roughness: 0.35,
-      transparent: true, opacity: 0.95
-    });
-    const stripMat = new THREE.MeshStandardMaterial({
-      color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 0.8
-    });
-
+  function addArenaWalls(parent, H, wallH, wallT, wallMat, stripMat) {
     const walls = [
       [0, -H, H*2 + wallT*2, wallT],
       [0,  H, H*2 + wallT*2, wallT],
@@ -1119,40 +1051,268 @@
     walls.forEach(([px, pz, w, d]) => {
       const wall = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), wallMat.clone());
       wall.position.set(px, wallH / 2, pz);
-      wall.castShadow = true; wall.receiveShadow = true;
-      scene.add(wall);
-      // Bande lumineuse haute
-      const topStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.022, d), stripMat);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      parent.add(wall);
+      const topStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.022, d), stripMat.clone());
       topStrip.position.set(px, wallH + 0.011, pz);
-      scene.add(topStrip);
-      // Bande lumineuse basse (sol)
-      const botStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.015, d), stripMat);
+      parent.add(topStrip);
+      const botStrip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.015, d), stripMat.clone());
       botStrip.position.set(px, 0.0075, pz);
-      scene.add(botStrip);
+      parent.add(botStrip);
     });
 
-    // ── Piliers d'angle ────────────────────────────
     [[-H,-H],[H,-H],[-H,H],[H,H]].forEach(([x, z]) => {
       const pillar = new THREE.Mesh(
         new THREE.BoxGeometry(wallT*2.2, wallH + 0.15, wallT*2.2), wallMat.clone()
       );
       pillar.position.set(x, (wallH + 0.15) / 2, z);
-      scene.add(pillar);
+      parent.add(pillar);
       const cap = new THREE.Mesh(
-        new THREE.BoxGeometry(wallT*2.8, 0.04, wallT*2.8), stripMat
+        new THREE.BoxGeometry(wallT*2.8, 0.04, wallT*2.8), stripMat.clone()
       );
       cap.position.set(x, wallH + 0.17, z);
-      scene.add(cap);
-      // Filet vertical lumineux sur l'arête
+      parent.add(cap);
       const vStrip = new THREE.Mesh(
-        new THREE.BoxGeometry(0.014, wallH, 0.014), stripMat
+        new THREE.BoxGeometry(0.014, wallH, 0.014), stripMat.clone()
       );
       vStrip.position.set(x, wallH / 2, z);
-      scene.add(vStrip);
+      parent.add(vStrip);
     });
   }
 
-  // ═══════════════════════════════════════════════
+  function buildArenaNeon(parent, H, wallH, wallT) {
+    const floorMat = new THREE.MeshStandardMaterial({ color:0x050b12, metalness:0.9, roughness:0.3 });
+    const floorBase = new THREE.Mesh(new THREE.PlaneGeometry(H*2, H*2), floorMat);
+    floorBase.rotation.x = -Math.PI / 2;
+    floorBase.receiveShadow = true;
+    parent.add(floorBase);
+
+    const panelMat = new THREE.MeshStandardMaterial({ color:0x0c1a28, metalness:0.85, roughness:0.2 });
+    for (let xi = -H; xi < H; xi += 2) {
+      for (let zi = -H; zi < H; zi += 2) {
+        const tile = new THREE.Mesh(new THREE.BoxGeometry(1.90, 0.012, 1.90), panelMat.clone());
+        tile.position.set(xi + 1, 0.001, zi + 1);
+        tile.receiveShadow = true;
+        parent.add(tile);
+      }
+    }
+
+    const lineMat = new THREE.MeshStandardMaterial({ color:0x00f5ff, emissive:0x00f5ff, emissiveIntensity:0.18 });
+    for (let i = -H; i <= H; i += 2) {
+      const lx = new THREE.Mesh(new THREE.BoxGeometry(H*2, 0.003, 0.05), lineMat);
+      lx.position.set(0, 0.003, i);
+      parent.add(lx);
+      const lz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.003, H*2), lineMat);
+      lz.position.set(i, 0.003, 0);
+      parent.add(lz);
+    }
+
+    const southMat = new THREE.MeshStandardMaterial({
+      color:0x001833, emissive:0x003366, emissiveIntensity:0.45,
+      metalness:0.9, roughness:0.2, transparent:true, opacity:0.65
+    });
+    const northMat = new THREE.MeshStandardMaterial({
+      color:0x1a0008, emissive:0x440011, emissiveIntensity:0.45,
+      metalness:0.9, roughness:0.2, transparent:true, opacity:0.65
+    });
+    const southZone = new THREE.Mesh(new THREE.BoxGeometry(H*2 - 0.3, 0.007, H - 0.15), southMat);
+    southZone.position.set(0, 0.002, H / 2);
+    parent.add(southZone);
+    const northZone = new THREE.Mesh(new THREE.BoxGeometry(H*2 - 0.3, 0.007, H - 0.15), northMat);
+    northZone.position.set(0, 0.002, -H / 2);
+    parent.add(northZone);
+
+    const accentMat = new THREE.MeshStandardMaterial({ color:0x00f5ff, emissive:0x00f5ff, emissiveIntensity:0.7 });
+    const divLine = new THREE.Mesh(new THREE.BoxGeometry(H*2 - 0.2, 0.006, 0.055), accentMat);
+    divLine.position.set(0, 0.004, 0);
+    parent.add(divLine);
+    const centerRing = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.022, 6, 64), accentMat.clone());
+    centerRing.rotation.x = Math.PI / 2;
+    centerRing.position.y = 0.005;
+    parent.add(centerRing);
+    const centerDot = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.006, 16), accentMat.clone());
+    centerDot.position.y = 0.003;
+    parent.add(centerDot);
+
+    const wallMat = new THREE.MeshStandardMaterial({
+      color:0x0a1825, metalness:0.8, roughness:0.35, transparent:true, opacity:0.95
+    });
+    const stripMat = new THREE.MeshStandardMaterial({ color:0x00f5ff, emissive:0x00f5ff, emissiveIntensity:0.8 });
+    addArenaWalls(parent, H, wallH, wallT, wallMat, stripMat);
+  }
+
+  function buildArenaSunset(parent, H, wallH, wallT) {
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(H * 1.32, H * 1.4, 0.32, 48),
+      new THREE.MeshStandardMaterial({ color:0x6f4b2f, metalness:0.12, roughness:0.95 })
+    );
+    base.position.y = -0.16;
+    base.receiveShadow = true;
+    parent.add(base);
+
+    const sand = new THREE.Mesh(
+      new THREE.CircleGeometry(H * 1.03, 48),
+      new THREE.MeshStandardMaterial({ color:0xd7aa63, roughness:1, metalness:0.02 })
+    );
+    sand.rotation.x = -Math.PI / 2;
+    sand.receiveShadow = true;
+    parent.add(sand);
+
+    const laneMat = new THREE.MeshStandardMaterial({ color:0xb2703b, roughness:0.88, metalness:0.06 });
+    for (let i = -H + 0.6; i <= H - 0.6; i += 1.2) {
+      const lane = new THREE.Mesh(new THREE.BoxGeometry(H * 1.7, 0.012, 0.16), laneMat.clone());
+      lane.position.set(0, 0.006, i);
+      parent.add(lane);
+    }
+
+    const creatorMat = new THREE.MeshStandardMaterial({ color:0x8c6239, roughness:0.9, transparent:true, opacity:0.72 });
+    const enemyMat = new THREE.MeshStandardMaterial({ color:0x7b3f2c, roughness:0.92, transparent:true, opacity:0.72 });
+    const creatorZone = new THREE.Mesh(new THREE.BoxGeometry(H*2 - 0.5, 0.01, H - 0.25), creatorMat);
+    creatorZone.position.set(0, 0.004, H / 2);
+    parent.add(creatorZone);
+    const enemyZone = new THREE.Mesh(new THREE.BoxGeometry(H*2 - 0.5, 0.01, H - 0.25), enemyMat);
+    enemyZone.position.set(0, 0.004, -H / 2);
+    parent.add(enemyZone);
+
+    const ringMat = new THREE.MeshStandardMaterial({ color:0xf4c06a, emissive:0x6a3b14, emissiveIntensity:0.35, roughness:0.55 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.05, 10, 50), ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.018;
+    parent.add(ring);
+    const center = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 20), ringMat.clone());
+    center.position.y = 0.014;
+    parent.add(center);
+
+    for (let i = 0; i < 18; i++) {
+      const angle = (i / 18) * Math.PI * 2;
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.1 + (i % 3) * 0.03, 0),
+        new THREE.MeshStandardMaterial({ color:0x8a694a, roughness:0.98, metalness:0.04 })
+      );
+      rock.position.set(Math.cos(angle) * (H + 0.32), 0.09, Math.sin(angle) * (H + 0.32));
+      rock.rotation.set(angle * 0.3, angle * 0.7, 0);
+      rock.castShadow = true;
+      parent.add(rock);
+    }
+
+    const wallMat = new THREE.MeshStandardMaterial({ color:0x5a3827, roughness:0.96, metalness:0.05 });
+    const stripMat = new THREE.MeshStandardMaterial({ color:0xf0ba64, emissive:0xa35a18, emissiveIntensity:0.22, roughness:0.45 });
+    addArenaWalls(parent, H, wallH, wallT, wallMat, stripMat);
+  }
+
+  function buildArenaIce(parent, H, wallH, wallT) {
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(H*2, H*2),
+      new THREE.MeshStandardMaterial({
+        color:0x9fd8ff, roughness:0.08, metalness:0.25, transparent:true, opacity:0.92,
+        emissive:0x12364f, emissiveIntensity:0.18
+      })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    parent.add(floor);
+
+    for (let i = 0; i < 14; i++) {
+      const crack = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2 + (i % 4) * 0.45, 0.004, 0.028),
+        new THREE.MeshStandardMaterial({ color:0xe8fbff, emissive:0x8ad9ff, emissiveIntensity:0.22 })
+      );
+      crack.position.set(((i % 7) - 3) * 1.1, 0.004, (Math.floor(i / 7) * 2 - 1) * 1.45);
+      crack.rotation.y = (i % 5) * 0.36;
+      parent.add(crack);
+    }
+
+    const creatorZone = new THREE.Mesh(
+      new THREE.BoxGeometry(H*2 - 0.35, 0.01, H - 0.2),
+      new THREE.MeshStandardMaterial({ color:0x83d7ff, transparent:true, opacity:0.3, emissive:0x2b85aa, emissiveIntensity:0.3 })
+    );
+    creatorZone.position.set(0, 0.005, H / 2);
+    parent.add(creatorZone);
+    const enemyZone = new THREE.Mesh(
+      new THREE.BoxGeometry(H*2 - 0.35, 0.01, H - 0.2),
+      new THREE.MeshStandardMaterial({ color:0xc8f4ff, transparent:true, opacity:0.26, emissive:0x6cb8d8, emissiveIntensity:0.24 })
+    );
+    enemyZone.position.set(0, 0.005, -H / 2);
+    parent.add(enemyZone);
+
+    const ringMat = new THREE.MeshStandardMaterial({ color:0xe4fbff, emissive:0x8ce3ff, emissiveIntensity:0.5, roughness:0.2, metalness:0.15 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.03, 10, 64), ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.01;
+    parent.add(ring);
+    const center = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), ringMat.clone());
+    center.position.set(0, 0.16, 0);
+    center.rotation.y = Math.PI / 4;
+    parent.add(center);
+
+    for (let i = 0; i < 12; i++) {
+      const shard = new THREE.Mesh(
+        new THREE.ConeGeometry(0.08 + (i % 3) * 0.03, 0.45 + (i % 2) * 0.12, 5),
+        new THREE.MeshStandardMaterial({ color:0xd5f6ff, emissive:0x5ec8f4, emissiveIntensity:0.18, roughness:0.2, metalness:0.08, transparent:true, opacity:0.95 })
+      );
+      const angle = (i / 12) * Math.PI * 2;
+      shard.position.set(Math.cos(angle) * (H + 0.22), 0.2, Math.sin(angle) * (H + 0.22));
+      shard.rotation.z = Math.PI + 0.18;
+      shard.rotation.y = angle;
+      shard.castShadow = true;
+      parent.add(shard);
+    }
+
+    const wallMat = new THREE.MeshStandardMaterial({ color:0x76b8d6, roughness:0.16, metalness:0.22, transparent:true, opacity:0.72 });
+    const stripMat = new THREE.MeshStandardMaterial({ color:0xeaffff, emissive:0x8feaff, emissiveIntensity:0.52, roughness:0.12 });
+    addArenaWalls(parent, H, wallH, wallT, wallMat, stripMat);
+  }
+
+  function buildArena() {
+    const H = ARENA, wallH = 0.8, wallT = 0.12;
+    const floorGroup = new THREE.Group();
+    floorGroup.name = 'ground';
+    if (arenaStyle === 'sunset-dunes') buildArenaSunset(floorGroup, H, wallH, wallT);
+    else if (arenaStyle === 'ice-core') buildArenaIce(floorGroup, H, wallH, wallT);
+    else buildArenaNeon(floorGroup, H, wallH, wallT);
+    scene.add(floorGroup);
+  }
+
+  function renderArenaPicker() {
+    let container = $('arena-picker');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'arena-picker';
+      const view = $('view-create');
+      if (view) view.insertBefore(container, $('room-code-display'));
+    }
+    if (!container) return;
+    container.innerHTML = '';
+    ARENA_STYLES.forEach(style => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'arena-card' + (style.id === selectedArenaStyle ? ' active' : '');
+      card.innerHTML = `
+        <div class="arena-card-head">
+          <span class="arena-card-name">${style.name}</span>
+          <span class="arena-card-tag">${style.tag}</span>
+        </div>
+        <div class="arena-card-desc">${style.desc}</div>
+      `;
+      card.addEventListener('click', () => {
+        selectedArenaStyle = style.id;
+        renderArenaPicker();
+      });
+      container.appendChild(card);
+    });
+  }
+
+  async function resolveArenaStyle() {
+    if (isCreator) {
+      arenaStyle = selectedArenaStyle;
+      await db.ref('rooms/' + roomId + '/meta').update({ arenaStyle });
+      return;
+    }
+    const snap = await db.ref('rooms/' + roomId + '/meta/arenaStyle').get();
+    arenaStyle = snap.exists() ? snap.val() : 'neon-grid';
+  }
+
   //  ROBOT DISTANT
   // ═══════════════════════════════════════════════
 
@@ -1505,6 +1665,7 @@
   async function start() {
     custRunning = false; // arrêter le rendu du customiseur
     $('splash').classList.add('hidden');
+    await resolveArenaStyle();
     camSide = isCreator ? 1 : -1;
     CAM_FIXED.z = 3.6 * camSide;
     robotPos.x = 0;
@@ -2202,6 +2363,7 @@
   // ── Navigation du splash ─────────────────────
   $('btn-create').addEventListener('click', () => {
     roomId = genCode();
+    renderArenaPicker();
     $('room-code-display').textContent = roomId;
     $('view-menu').style.display  = 'none';
     $('view-create').style.display = 'flex';
