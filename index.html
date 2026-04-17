@@ -319,6 +319,17 @@
     body.ls #btn-landscape {
       top:56px; right:16px; left:auto; transform:none;
       writing-mode:vertical-rl; }
+    /* Countdown overlay */
+    #countdown-overlay {
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      z-index:250; pointer-events:none; opacity:0; transition:opacity 0.2s; }
+    #countdown-overlay.vis { opacity:1; }
+    #countdown-number {
+      font-family:'Share Tech Mono','Courier New',monospace;
+      font-size:clamp(80px,24vw,160px); font-weight:700; letter-spacing:-.02em;
+      text-shadow:0 0 50px currentColor, 0 0 100px currentColor;
+      color:#fff; transition:transform 0.1s ease-out, color 0.15s;
+      transform:scale(1); }
   </style>
 </head>
 <body>
@@ -355,6 +366,7 @@
   <button id="btn-landscape">↺ PAYSAGE</button>
   <button id="btn-special"><span id="btn-special-ring"></span><span id="btn-special-label">SP</span></button>
   <button id="btn-attack"></button>
+  <div id="countdown-overlay"><div id="countdown-number"></div></div>
   <div id="special-ready-alert"></div>
 
   <!-- HP bars -->
@@ -525,6 +537,7 @@
   const ATTACK_RANGE = 1.5;
   const BASE_ATTACK_DMG = 20;
   let matchStats = null;
+  let matchStarted = false;
   let selectedArenaStyle = 'neon-grid';
   let arenaStyle = 'neon-grid';
   const ARENA_STYLES = [
@@ -2235,6 +2248,152 @@
     db.ref('rooms/' + roomId + '/players/' + myId).set(payload);
   }
 
+  // ═══════════════════════════════════════════════
+  //  AUDIO ENGINE
+  // ═══════════════════════════════════════════════
+
+  let audioCtx = null;
+  function _ac() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playSound(type) {
+    try {
+      const ctx = _ac();
+      const t = ctx.currentTime;
+      switch (type) {
+        case 'attack': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(380, t); o.frequency.exponentialRampToValueAtTime(80, t + 0.11);
+          g.gain.setValueAtTime(0.38, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+          o.start(t); o.stop(t + 0.11); break;
+        }
+        case 'hit': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.2);
+          g.gain.setValueAtTime(0.55, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+          o.start(t); o.stop(t + 0.2);
+          const bsz = Math.floor(ctx.sampleRate * 0.09);
+          const buf = ctx.createBuffer(1, bsz, ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < bsz; i++) d[i] = (Math.random() * 2 - 1) * 0.28;
+          const s = ctx.createBufferSource(), ng = ctx.createGain();
+          s.buffer = buf; s.connect(ng); ng.connect(ctx.destination);
+          ng.gain.setValueAtTime(0.45, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+          s.start(t); break;
+        }
+        case 'shield': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(1400, t); o.frequency.exponentialRampToValueAtTime(700, t + 0.15);
+          g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+          o.start(t); o.stop(t + 0.15); break;
+        }
+        case 'collision': {
+          const bsz = Math.floor(ctx.sampleRate * 0.07);
+          const buf = ctx.createBuffer(1, bsz, ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < bsz; i++) d[i] = Math.random() * 2 - 1;
+          const s = ctx.createBufferSource(), g = ctx.createGain();
+          s.buffer = buf; s.connect(g); g.connect(ctx.destination);
+          g.gain.setValueAtTime(0.32, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+          s.start(t); break;
+        }
+        case 'special': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(1800, t + 0.22);
+          g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+          o.start(t); o.stop(t + 0.25); break;
+        }
+        case 'countdown': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine'; o.frequency.value = 440;
+          g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+          o.start(t); o.stop(t + 0.13); break;
+        }
+        case 'go': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine'; o.frequency.value = 880;
+          g.gain.setValueAtTime(0.38, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+          o.start(t); o.stop(t + 0.35); break;
+        }
+        case 'victory': {
+          [261.63, 329.63, 392, 523.25].forEach((f, i) => {
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.type = 'sine'; o.frequency.value = f;
+            const ts = t + i * 0.13;
+            g.gain.setValueAtTime(0, ts); g.gain.linearRampToValueAtTime(0.28, ts + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, ts + 0.28);
+            o.start(ts); o.stop(ts + 0.28);
+          }); break;
+        }
+        case 'defeat': {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(55, t + 0.65);
+          g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+          o.start(t); o.stop(t + 0.65); break;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // ═══════════════════════════════════════════════
+  //  COUNTDOWN
+  // ═══════════════════════════════════════════════
+
+  function showCountdown(startAt) {
+    const overlay = $('countdown-overlay');
+    const numEl = $('countdown-number');
+    matchStarted = false;
+    const lockControls = () => {
+      $('joystick-zone').style.pointerEvents = 'none';
+      $('btn-attack').style.pointerEvents = 'none';
+      $('btn-special').style.pointerEvents = 'none';
+    };
+    const unlockControls = () => {
+      $('joystick-zone').style.pointerEvents = '';
+      $('btn-attack').style.pointerEvents = '';
+      $('btn-special').style.pointerEvents = '';
+    };
+    lockControls();
+    overlay.classList.add('vis');
+    let lastStep = null;
+    function tick() {
+      const rem = startAt - Date.now();
+      let step;
+      if (rem > 2000) step = '3';
+      else if (rem > 1000) step = '2';
+      else if (rem > 0) step = '1';
+      else if (rem > -800) step = 'GO!';
+      else { overlay.classList.remove('vis'); unlockControls(); return; }
+      if (step !== lastStep) {
+        lastStep = step;
+        numEl.textContent = step;
+        numEl.style.color = step === '3' ? '#ffffff' : step === '2' ? '#ff9f4d' : step === '1' ? '#ff4d4d' : '#00f5ff';
+        numEl.style.transform = 'scale(1.5)';
+        requestAnimationFrame(() => { numEl.style.transform = 'scale(1)'; });
+        if (step === 'GO!') { matchStarted = true; unlockControls(); playSound('go'); }
+        else playSound('countdown');
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
   function setupFirebase() {
     // Afficher le code de room
     $('stat-room').textContent = roomId;
@@ -2332,7 +2491,24 @@
       });
 
       $('stat-players').textContent = Object.keys(all).length + '/2';
+
+      // Creator writes startAt when both players connected
+      if (isCreator && Object.keys(all).length >= 2) {
+        const saRef = db.ref('rooms/' + roomId + '/startAt');
+        saRef.once('value', s => { if (!s.exists()) saRef.set(Date.now() + 3500); });
+      }
     });
+
+    // Listen to startAt for countdown
+    let countdownTriggered = false;
+    db.ref('rooms/' + roomId + '/startAt').on('value', snap => {
+      if (!snap.exists() || countdownTriggered) return;
+      const sa = snap.val();
+      if (sa - Date.now() > -500) { countdownTriggered = true; showCountdown(sa); }
+    });
+
+    // Solo fallback: unlock controls after 10s if no opponent
+    setTimeout(() => { if (!matchStarted) { matchStarted = true; } }, 10000);
 
     // Nettoyage à la déconnexion
     db.ref('rooms/' + roomId + '/players/' + myId).onDisconnect().remove();
@@ -2484,8 +2660,10 @@
     if (shieldActive) {
       dmg = Math.round(dmg * 0.35);
       stunMs = 0;
+      playSound('shield');
     }
     if (dmg > 0) {
+      playSound(source === 'collision' ? 'collision' : 'hit');
       myHP = Math.max(0, myHP - dmg);
       if (matchStats) matchStats.damageTaken += dmg;
       updateHPBars();
@@ -2864,6 +3042,7 @@
     const pos = new THREE.Vector3();
     group.getWorldPosition(pos);
     spawnExplosionBurst(pos, won ? 0x00f5ff : 0xff5533);
+    playSound(won ? 'victory' : 'defeat');
     group.visible = false;
     setTimeout(() => endGame(won), 3000);
   }
@@ -2920,9 +3099,10 @@
   }
 
   function doAttack() {
-    if (gameOver || attackAnim) return;
+    if (gameOver || attackAnim || !matchStarted) return;
     const now = Date.now();
     if (now < attackCooldown) return;
+    playSound('attack');
     const frontOpt = PIECES.front.options[PIECES.front.current];
     const dmg = Math.round(frontOpt.attack * BASE_ATTACK_DMG);
     lastOutgoingAttackAt = now;
@@ -2991,6 +3171,7 @@
       publishImmediate();
     }
       if (!triggered) return;
+      playSound('special');
       if (matchStats) matchStats.specialUses += 1;
       specialCooldown = now + antenna.cooldownMs;
       specialReadyPending = true;
@@ -3119,6 +3300,7 @@
     myMaxHP = calcMaxHP();
     myHP = myMaxHP;
     endSequence = null;
+    matchStarted = false;
     matchStats = {
       startedAt: Date.now(),
       distance: 0,
@@ -3173,7 +3355,7 @@
     cleanupConsumedRemoteHazards(now);
 
     // Déplacement + orientation robot
-    if(robotPlaced){
+    if(robotPlaced && matchStarted){
       const prevX = robotPos.x;
       const prevZ = robotPos.z;
       const isStunned = now < stunUntil;
