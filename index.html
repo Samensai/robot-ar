@@ -128,6 +128,46 @@
     #code-input::placeholder { color:rgba(0,245,255,0.18); letter-spacing:.3em; }
     .mode-note { margin-top:0; margin-bottom:0; font-size:11px; font-family:var(--font-mono);
       color:rgba(200,230,255,0.3); text-align:center; max-width:280px; line-height:1.6; }
+    .menu-panel {
+      width:100%; margin-top:14px; padding:14px 14px 12px; border-radius:14px;
+      border:1px solid rgba(0,245,255,0.12); background:rgba(5,12,20,0.74); backdrop-filter:blur(10px);
+    }
+    .menu-meta-grid { display:grid; grid-template-columns:1fr auto; gap:8px 12px; align-items:center; }
+    .menu-meta-label { font-family:var(--font-mono); font-size:10px; letter-spacing:.14em; color:rgba(190,225,255,0.42); }
+    .menu-meta-value { font-family:var(--font-mono); font-size:11px; color:var(--cyan); text-align:right; }
+    .wallet-chip {
+      display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px;
+      border:1px solid rgba(255,190,90,0.22); background:rgba(255,190,90,0.08); color:#ffd28d;
+      font-family:var(--font-mono); font-size:10px; letter-spacing:.12em;
+    }
+    .auth-panel { width:100%; display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+    .auth-panel.hidden { display:none; }
+    .shop-list { width:100%; display:flex; flex-direction:column; gap:10px; margin-top:18px; }
+    .shop-card {
+      width:100%; padding:14px; border-radius:14px; background:rgba(5,12,20,0.72);
+      border:1px solid rgba(0,245,255,0.12); display:flex; flex-direction:column; gap:10px;
+    }
+    .shop-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .shop-card-title { font-family:var(--font-mono); font-size:12px; letter-spacing:.12em; color:var(--cyan); }
+    .shop-card-desc { font-size:12px; line-height:1.6; color:rgba(210,235,255,0.66); text-align:left; }
+    .shop-card-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .shop-empty {
+      width:100%; padding:18px 14px; border:1px dashed rgba(0,245,255,0.16); border-radius:14px;
+      font-family:var(--font-mono); font-size:11px; line-height:1.7; text-align:center; color:rgba(200,230,255,0.48);
+    }
+    .field-input {
+      width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(0,245,255,0.16);
+      background:rgba(5,12,20,0.76); color:var(--text); font-family:var(--font-mono); font-size:12px; outline:none;
+    }
+    .field-input::placeholder { color:rgba(200,230,255,0.28); }
+    .inline-actions { width:100%; display:flex; gap:10px; }
+    .inline-actions > * { flex:1; }
+    .status-line {
+      width:100%; min-height:20px; font-family:var(--font-mono); font-size:10px; letter-spacing:.1em;
+      color:rgba(200,230,255,0.5); text-align:center; line-height:1.6;
+    }
+    .status-line.error { color:#ff9e7d; }
+    .status-line.ok { color:#95ffd9; }
 
     /* ═══════════════════════════════════════════
        CUSTOMISEUR 3D
@@ -439,10 +479,32 @@
 
     <!-- Vue 1 : menu principal -->
     <div class="splash-view" id="view-menu">
+      <div class="menu-panel">
+        <div class="menu-meta-grid">
+          <div class="menu-meta-label">COMPTE</div>
+          <div class="menu-meta-value" id="menu-auth-state">HORS LIGNE</div>
+          <div class="menu-meta-label">EMAIL</div>
+          <div class="menu-meta-value" id="menu-auth-email">INVITE</div>
+          <div class="menu-meta-label">JETONS</div>
+          <div class="menu-meta-value"><span class="wallet-chip"><span>CR</span><span id="menu-coins">0</span></span></div>
+        </div>
+      </div>
       <button class="btn-splash-sec" id="btn-customize" style="margin-bottom:14px;">✦ PERSONNALISER →</button>
       <button class="btn-splash-primary" id="btn-create">[ CRÉER UNE PARTIE ]</button>
+      <button class="btn-splash-sec" id="btn-open-shop">Boutique →</button>
       <button class="btn-splash-sec" id="btn-show-join">Rejoindre une partie →</button>
+      <button class="btn-splash-sec" id="btn-toggle-auth">Compte / Connexion →</button>
       <button class="btn-splash-back" id="btn-show-onboard" style="margin-top:16px;">? CONTRÔLES</button>
+      <div class="auth-panel hidden" id="auth-panel">
+        <input id="auth-email" class="field-input" type="email" inputmode="email" autocomplete="email" placeholder="EMAIL"/>
+        <input id="auth-password" class="field-input" type="password" autocomplete="current-password" placeholder="MOT DE PASSE"/>
+        <div class="inline-actions">
+          <button class="btn-splash-primary" id="btn-auth-login" type="button">[ SE CONNECTER ]</button>
+          <button class="btn-splash-sec" id="btn-auth-signup" type="button">Créer un compte</button>
+        </div>
+        <button class="btn-splash-back" id="btn-auth-logout" type="button" style="display:none;margin-top:0;">SE DECONNECTER</button>
+        <div class="status-line" id="auth-status"></div>
+      </div>
     </div>
 
     <!-- Vue personnalisation plein écran -->
@@ -476,6 +538,7 @@
         <div id="cust-progression" class="hidden">
           <div class="cust-panel-title">PROGRESSION</div>
           <div class="cust-meta-line"><span>VICTOIRES</span><span class="cust-meta-value" id="cust-wins">0</span></div>
+          <div class="cust-meta-line"><span>JETONS</span><span class="cust-meta-value" id="cust-coins">0</span></div>
           <input id="cust-build-name" class="cust-build-input" type="text" maxlength="22" placeholder="NOM DU BUILD"/>
           <div class="cust-presets" id="cust-presets"></div>
           <div id="cust-unlock-line"></div>
@@ -512,11 +575,26 @@
       <button class="btn-splash-primary" id="btn-start-join">[ REJOINDRE ]</button>
       <button class="btn-splash-back" id="btn-back-join">← Retour</button>
     </div>
+
+    <div class="splash-view" id="view-shop" style="display:none">
+      <div class="menu-panel" style="margin-top:0;">
+        <div class="menu-meta-grid">
+          <div class="menu-meta-label">SOLDE</div>
+          <div class="menu-meta-value"><span class="wallet-chip"><span>CR</span><span id="shop-coins">0</span></span></div>
+          <div class="menu-meta-label">COMPTE</div>
+          <div class="menu-meta-value" id="shop-auth-email">INVITE</div>
+        </div>
+      </div>
+      <p class="mode-note" id="shop-subtitle" style="margin-top:16px;">Achète des pièces et des skins sans attendre les paliers de victoire.</p>
+      <div class="shop-list" id="shop-list"></div>
+      <button class="btn-splash-back" id="btn-back-shop">← Retour</button>
+    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
 
   function dbgLog(msg, color) {
@@ -534,6 +612,9 @@
     databaseURL:       'https://robot-ar-b99e3-default-rtdb.europe-west1.firebasedatabase.app'
   });
   const db = firebase.database();
+  const SUPABASE_URL = 'https://koeemdahxvqxfkgdmjvl.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvZWVtZGFoeHZxeGZrZ2RtanZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTgxMjgsImV4cCI6MjA5MTk5NDEyOH0.NxVso8ztYSyVDLDiHoD5jHuP546qB3-KjQQQJk7Vl3E';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Room : défini quand le joueur crée ou rejoint une partie
   let roomId = null;
@@ -597,8 +678,10 @@
 
   // Couleurs du robot : couleur 1 = base principale, couleur 2 = accents
   const ROBOT_CONFIG_KEY = 'robotar_config_v3';
-  const ROBOT_PROGRESS_KEY = 'robotar_progress_v1';
+  const ROBOT_PROGRESS_KEY = 'robotar_progress_v2';
+  const ROBOT_PROGRESS_LEGACY_KEY = 'robotar_progress_v1';
   const ROBOT_PRESETS_KEY = 'robotar_presets_v1';
+  const ROBOT_AUTH_CACHE_KEY = 'robotar_auth_email_v1';
   const PIECE_ORDER = ['wheels', 'rims', 'chassis', 'body', 'front', 'antenna'];
   const STYLE_PRESETS = [
     { id:'steel',   name:'Acier brut',  hex:'#5f7b92', base:0x5f7b92, accent:0xd8edf9, emissive:0x10202e, pattern:'solid', rarity:'COMMUN', unlockWins:0 },
@@ -621,8 +704,13 @@
   };
   let pieceStyles = { ...DEFAULT_PIECE_STYLES };
   let buildName = 'PROTO-01';
-  let progression = { wins: 0 };
+  let progression = { wins: 0, coins: 0, ownedStyles: [], ownedPieces: {} };
   let savedPresets = [null, null, null];
+  let authUser = null;
+  let authPanelOpen = false;
+  let cloudSyncTimer = null;
+  let cloudSyncInFlight = false;
+  let shopItems = [];
 
   function copyInvite() {
     const ov = document.createElement('div');
@@ -1532,18 +1620,53 @@
     });
   }
 
+  function sanitizeOwnedPieces(raw) {
+    const out = {};
+    PIECE_ORDER.forEach(pieceType => {
+      const entries = Array.isArray(raw?.[pieceType]) ? raw[pieceType] : [];
+      out[pieceType] = entries.filter(key => !!PIECES[pieceType]?.options?.[key]);
+    });
+    return out;
+  }
+
+  function normalizeProgression(raw = {}) {
+    return {
+      wins: Math.max(0, raw?.wins || 0),
+      coins: Math.max(0, raw?.coins || 0),
+      ownedStyles: Array.isArray(raw?.ownedStyles) ? raw.ownedStyles.filter(id => STYLE_PRESETS.some(style => style.id === id)) : [],
+      ownedPieces: sanitizeOwnedPieces(raw?.ownedPieces || {})
+    };
+  }
+
+  function getCoins() {
+    return progression?.coins || 0;
+  }
+
+  function hasOwnedStyle(styleId) {
+    return progression?.ownedStyles?.includes(styleId);
+  }
+
+  function hasOwnedPiece(pieceType, key) {
+    return progression?.ownedPieces?.[pieceType]?.includes(key);
+  }
+
+  function grantCoins(amount) {
+    progression.coins = Math.max(0, getCoins() + Math.max(0, Math.round(amount || 0)));
+    saveProgression();
+  }
+
   function getWins() {
     return progression?.wins || 0;
   }
 
   function isStyleUnlocked(styleId) {
     const style = STYLE_PRESETS.find(s => s.id === styleId);
-    return !!style && getWins() >= (style.unlockWins || 0);
+    return !!style && (getWins() >= (style.unlockWins || 0) || hasOwnedStyle(styleId));
   }
 
   function isPieceUnlocked(pieceType, key) {
     const opt = PIECES[pieceType]?.options?.[key];
-    return !!opt && getWins() >= (opt.unlockWins || 0);
+    return !!opt && (getWins() >= (opt.unlockWins || 0) || hasOwnedPiece(pieceType, key));
   }
 
   function getUnlockedStylePresets() {
@@ -1567,7 +1690,7 @@
     });
     candidates.sort((a, b) => a.wins - b.wins);
     if (!candidates.length) return 'TOUT EST DEBLOQUE';
-    return `PROCHAIN : ${candidates[0].label} A ${candidates[0].wins} VICTOIRES`;
+    return `PROCHAIN : ${candidates[0].label} A ${candidates[0].wins} VICTOIRES OU EN BOUTIQUE`;
   }
 
   function getNewUnlocks(fromWins, toWins) {
@@ -1619,14 +1742,18 @@
     try {
       localStorage.setItem(ROBOT_PROGRESS_KEY, JSON.stringify(progression));
     } catch (_) {}
+    updateMenuIdentityUI();
+    updateCustProgressUI();
+    renderShop();
+    requestCloudSync();
   }
 
   function loadProgression() {
     try {
-      const raw = localStorage.getItem(ROBOT_PROGRESS_KEY);
+      const raw = localStorage.getItem(ROBOT_PROGRESS_KEY) || localStorage.getItem(ROBOT_PROGRESS_LEGACY_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      progression = { wins: Math.max(0, parsed?.wins || 0) };
+      progression = normalizeProgression(parsed);
     } catch (_) {}
   }
 
@@ -1634,6 +1761,7 @@
     try {
       localStorage.setItem(ROBOT_PRESETS_KEY, JSON.stringify(savedPresets));
     } catch (_) {}
+    requestCloudSync();
   }
 
   function loadPresets() {
@@ -1660,6 +1788,7 @@
         buildName: normalizeBuildName(buildName)
       }));
     } catch (_) {}
+    requestCloudSync();
   }
 
   function loadRobotConfig() {
@@ -1684,9 +1813,324 @@
     } catch (_) {}
   }
 
+  function priceFromRarity(rarity = 'COMMUN', unlockWins = 0) {
+    const base = { COMMUN: 120, RARE: 260, EPIC: 520, LEGENDE: 980 }[rarity] || 180;
+    return base + Math.max(0, unlockWins || 0) * 18;
+  }
+
+  function getDefaultShopItems() {
+    const items = [];
+    STYLE_PRESETS.forEach(style => {
+      if ((style.unlockWins || 0) <= 0) return;
+      items.push({
+        item_type: 'style',
+        piece_type: null,
+        item_key: style.id,
+        label: `Skin ${style.name}`,
+        description: `${style.rarity} • debloque le style pour toutes les pieces`,
+        price: priceFromRarity(style.rarity, style.unlockWins),
+        rarity: style.rarity,
+        unlock_wins: style.unlockWins,
+        active: true
+      });
+    });
+    PIECE_ORDER.forEach(pieceType => {
+      Object.entries(PIECES[pieceType]?.options || {}).forEach(([key, opt]) => {
+        if ((opt.unlockWins || 0) <= 0) return;
+        const rarity = opt.unlockWins >= 8 ? 'EPIC' : opt.unlockWins >= 4 ? 'RARE' : 'COMMUN';
+        items.push({
+          item_type: 'piece',
+          piece_type: pieceType,
+          item_key: key,
+          label: `${PIECES[pieceType].label} ${opt.name}`,
+          description: `${rarity} • variante de ${PIECES[pieceType].label.toLowerCase()}`,
+          price: priceFromRarity(rarity, opt.unlockWins) + 40,
+          rarity,
+          unlock_wins: opt.unlockWins,
+          active: true
+        });
+      });
+    });
+    return items.sort((a, b) => a.price - b.price);
+  }
+
+  function getDisplayEmail() {
+    return authUser?.email || localStorage.getItem(ROBOT_AUTH_CACHE_KEY) || 'INVITE';
+  }
+
+  function setAuthStatus(message = '', kind = '') {
+    const el = $('auth-status');
+    if (!el) return;
+    el.textContent = message;
+    el.className = `status-line${kind ? ' ' + kind : ''}`;
+  }
+
+  function updateMenuIdentityUI() {
+    if ($('menu-auth-state')) $('menu-auth-state').textContent = authUser ? 'CONNECTE' : 'LOCAL';
+    if ($('menu-auth-email')) $('menu-auth-email').textContent = getDisplayEmail();
+    if ($('menu-coins')) $('menu-coins').textContent = String(getCoins());
+    if ($('shop-coins')) $('shop-coins').textContent = String(getCoins());
+    if ($('shop-auth-email')) $('shop-auth-email').textContent = getDisplayEmail();
+    if ($('btn-auth-logout')) $('btn-auth-logout').style.display = authUser ? 'block' : 'none';
+    if ($('shop-subtitle')) {
+      $('shop-subtitle').textContent = authUser
+        ? 'Achète des pièces et des skins avec tes jetons cloud.'
+        : 'Connecte-toi pour synchroniser tes achats et ton portefeuille.';
+    }
+  }
+
+  function setAuthPanelOpen(open) {
+    authPanelOpen = !!open;
+    $('auth-panel')?.classList.toggle('hidden', !authPanelOpen);
+    $('btn-toggle-auth')?.classList.toggle('active', authPanelOpen);
+  }
+
+  function getOwnedInventoryRows() {
+    const rows = [];
+    progression.ownedStyles.forEach(styleId => {
+      rows.push({ item_type: 'style', piece_type: '', item_key: styleId });
+    });
+    Object.entries(progression.ownedPieces || {}).forEach(([pieceType, keys]) => {
+      (keys || []).forEach(key => rows.push({ item_type: 'piece', piece_type: pieceType, item_key: key }));
+    });
+    return rows;
+  }
+
+  async function fetchShopItems() {
+    const { data, error } = await supabaseClient.from('shop_items')
+      .select('item_type,piece_type,item_key,label,description,price,rarity,unlock_wins,active')
+      .eq('active', true)
+      .order('price', { ascending: true });
+    if (error || !Array.isArray(data) || !data.length) {
+      shopItems = getDefaultShopItems();
+    } else {
+      shopItems = data;
+    }
+    renderShop();
+  }
+
+  async function loadCloudState() {
+    if (!authUser) return;
+    const [{ data: profile }, { data: wallet }, { data: inventory }] = await Promise.all([
+      supabaseClient.from('profiles').select('wins,build_name,robot_config,presets').eq('user_id', authUser.id).maybeSingle(),
+      supabaseClient.from('player_wallet').select('coins').eq('user_id', authUser.id).maybeSingle(),
+      supabaseClient.from('player_inventory').select('item_type,piece_type,item_key').eq('user_id', authUser.id)
+    ]);
+
+    if (profile) {
+      progression.wins = Math.max(getWins(), profile.wins || 0);
+      if (profile.build_name) buildName = normalizeBuildName(profile.build_name);
+      if (Array.isArray(profile.presets)) {
+        savedPresets = [profile.presets[0] || null, profile.presets[1] || null, profile.presets[2] || null];
+      }
+      if (profile.robot_config && typeof profile.robot_config === 'object') {
+        const cfg = profile.robot_config;
+        PIECE_ORDER.forEach(pieceType => {
+          if (cfg[pieceType] && PIECES[pieceType]?.options?.[cfg[pieceType]]) PIECES[pieceType].current = cfg[pieceType];
+        });
+        if (cfg.styles && typeof cfg.styles === 'object') {
+          PIECE_ORDER.forEach(pieceType => {
+            if (cfg.styles[pieceType] && STYLE_PRESETS.some(style => style.id === cfg.styles[pieceType])) {
+              pieceStyles[pieceType] = cfg.styles[pieceType];
+            }
+          });
+        }
+      }
+    }
+    if (wallet) progression.coins = Math.max(getCoins(), wallet.coins || 0);
+    if (Array.isArray(inventory)) {
+      inventory.forEach(row => {
+        if (row.item_type === 'style' && row.item_key && !progression.ownedStyles.includes(row.item_key)) {
+          progression.ownedStyles.push(row.item_key);
+        }
+        if (row.item_type === 'piece' && row.piece_type && row.item_key) {
+          progression.ownedPieces[row.piece_type] = progression.ownedPieces[row.piece_type] || [];
+          if (!progression.ownedPieces[row.piece_type].includes(row.item_key)) {
+            progression.ownedPieces[row.piece_type].push(row.item_key);
+          }
+        }
+      });
+    }
+    progression = normalizeProgression(progression);
+    sanitizeCustomizationUnlocks();
+    saveProgression();
+    savePresets();
+    saveRobotConfig();
+  }
+
+  async function pushCloudState() {
+    if (!authUser || cloudSyncInFlight) return;
+    cloudSyncInFlight = true;
+    try {
+      const profilePayload = {
+        user_id: authUser.id,
+        email: authUser.email,
+        wins: getWins(),
+        build_name: normalizeBuildName(buildName),
+        robot_config: snapshotCurrentBuild(),
+        presets: savedPresets,
+        updated_at: new Date().toISOString()
+      };
+      await supabaseClient.from('profiles').upsert(profilePayload, { onConflict: 'user_id' });
+      await supabaseClient.from('player_wallet').upsert({
+        user_id: authUser.id,
+        coins: getCoins(),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      const rows = getOwnedInventoryRows().map(row => ({
+        user_id: authUser.id,
+        item_type: row.item_type,
+        piece_type: row.piece_type,
+        item_key: row.item_key,
+        owned: true,
+        purchased_at: new Date().toISOString()
+      }));
+      if (rows.length) {
+        await supabaseClient.from('player_inventory').upsert(rows, { onConflict: 'user_id,item_type,piece_type,item_key' });
+      }
+    } finally {
+      cloudSyncInFlight = false;
+    }
+  }
+
+  function requestCloudSync() {
+    if (!authUser) return;
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(() => { pushCloudState().catch(() => {}); }, 300);
+  }
+
+  async function restoreSession() {
+    const { data } = await supabaseClient.auth.getSession();
+    authUser = data.session?.user || null;
+    if (authUser?.email) localStorage.setItem(ROBOT_AUTH_CACHE_KEY, authUser.email);
+    updateMenuIdentityUI();
+    if (authUser) {
+      await loadCloudState();
+      await fetchShopItems();
+      setAuthStatus(`Connecte: ${authUser.email}`, 'ok');
+    } else {
+      shopItems = getDefaultShopItems();
+      renderShop();
+    }
+  }
+
+  async function handleAuth(mode) {
+    const email = $('auth-email')?.value.trim().toLowerCase();
+    const password = $('auth-password')?.value || '';
+    if (!email || !password) {
+      setAuthStatus('Entre un email et un mot de passe.', 'error');
+      return;
+    }
+    setAuthStatus(mode === 'signup' ? 'Creation du compte...' : 'Connexion...', '');
+    const action = mode === 'signup'
+      ? supabaseClient.auth.signUp({ email, password })
+      : supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await action;
+    if (error) {
+      setAuthStatus(error.message, 'error');
+      return;
+    }
+    authUser = data.user || data.session?.user || null;
+    if (authUser?.email) localStorage.setItem(ROBOT_AUTH_CACHE_KEY, authUser.email);
+    if (mode === 'signup' && !data.session) {
+      updateMenuIdentityUI();
+      setAuthStatus('Compte cree. Confirme ton email si Supabase exige la verification.', 'ok');
+      return;
+    }
+    await loadCloudState().catch(() => {});
+    await fetchShopItems().catch(() => { shopItems = getDefaultShopItems(); renderShop(); });
+    await pushCloudState().catch(() => {});
+    updateMenuIdentityUI();
+    setAuthStatus(mode === 'signup' ? 'Compte cree et synchronise.' : 'Connexion reussie.', 'ok');
+  }
+
+  async function handleLogout() {
+    await supabaseClient.auth.signOut();
+    authUser = null;
+    updateMenuIdentityUI();
+    setAuthStatus('Session fermee. Progression locale conservee.', '');
+  }
+
+  function renderShop() {
+    updateMenuIdentityUI();
+    const host = $('shop-list');
+    if (!host) return;
+    const catalog = (shopItems && shopItems.length ? shopItems : getDefaultShopItems()).filter(item => item.active !== false);
+    host.innerHTML = '';
+    if (!catalog.length) {
+      host.innerHTML = '<div class="shop-empty">La boutique sera remplie des que les articles Supabase seront disponibles.</div>';
+      return;
+    }
+    catalog.forEach(item => {
+      const owned = item.item_type === 'style' ? hasOwnedStyle(item.item_key) : hasOwnedPiece(item.piece_type, item.item_key);
+      const naturallyUnlocked = item.item_type === 'style'
+        ? getWins() >= (item.unlock_wins || 0)
+        : getWins() >= (item.unlock_wins || 0);
+      const canBuy = authUser && !owned && !naturallyUnlocked && getCoins() >= (item.price || 0);
+      const card = document.createElement('div');
+      card.className = 'shop-card';
+      const unlockInfo = (item.unlock_wins || 0) > 0 ? ` ou ${item.unlock_wins} victoire(s)` : '';
+      card.innerHTML = `
+        <div class="shop-card-head">
+          <div class="shop-card-title">${item.label}</div>
+          <div class="wallet-chip"><span>CR</span><span>${item.price || 0}</span></div>
+        </div>
+        <div class="shop-card-desc">${item.description || ''}</div>
+        <div class="shop-card-meta">
+          <div class="menu-meta-label">${item.rarity || 'COMMUN'}${unlockInfo}</div>
+        </div>`;
+      const buyBtn = document.createElement('button');
+      buyBtn.type = 'button';
+      buyBtn.className = owned || naturallyUnlocked ? 'btn-splash-sec' : 'btn-splash-primary';
+      buyBtn.textContent = naturallyUnlocked ? '[ DEBLOQUE PAR VICTOIRES ]'
+        : owned ? '[ DEJA OBTENU ]'
+        : !authUser ? '[ CONNECTE-TOI ]'
+        : canBuy ? '[ ACHETER ]'
+        : '[ JETONS INSUFFISANTS ]';
+      buyBtn.disabled = owned || naturallyUnlocked || !authUser || !canBuy;
+      buyBtn.style.opacity = buyBtn.disabled ? '0.62' : '1';
+      if (!authUser && !owned && !naturallyUnlocked) buyBtn.disabled = false;
+      buyBtn.addEventListener('click', async () => {
+        if (!authUser) {
+          setAuthPanelOpen(true);
+          $('view-shop').style.display = 'none';
+          $('view-menu').style.display = 'flex';
+          setAuthStatus('Connecte-toi pour acheter et synchroniser.', '');
+          return;
+        }
+        await purchaseShopItem(item);
+      });
+      card.appendChild(buyBtn);
+      host.appendChild(card);
+    });
+  }
+
+  async function purchaseShopItem(item) {
+    if (!authUser) return;
+    if (getCoins() < (item.price || 0)) {
+      setAuthStatus('Jetons insuffisants pour cet achat.', 'error');
+      return;
+    }
+    progression.coins = Math.max(0, getCoins() - (item.price || 0));
+    if (item.item_type === 'style') {
+      if (!progression.ownedStyles.includes(item.item_key)) progression.ownedStyles.push(item.item_key);
+    } else if (item.item_type === 'piece') {
+      progression.ownedPieces[item.piece_type] = progression.ownedPieces[item.piece_type] || [];
+      if (!progression.ownedPieces[item.piece_type].includes(item.item_key)) progression.ownedPieces[item.piece_type].push(item.item_key);
+    }
+    progression = normalizeProgression(progression);
+    sanitizeCustomizationUnlocks();
+    saveProgression();
+    saveRobotConfig();
+    await pushCloudState().catch(() => {});
+    renderShop();
+    setAuthStatus(`${item.label} ajoute a ton inventaire.`, 'ok');
+  }
+
   loadProgression();
   loadPresets();
   loadRobotConfig();
+  progression = normalizeProgression(progression);
   sanitizeCustomizationUnlocks();
 
   // Positions des roues (réutilisées par les deux variantes)
@@ -3113,14 +3557,15 @@
     gameOver = true;
     endSequence = null;
     const prevWins = getWins();
+    const coinReward = won ? 120 : 45;
     let newUnlocks = [];
     if (won) {
       progression.wins = prevWins + 1;
-      saveProgression();
       newUnlocks = getNewUnlocks(prevWins, progression.wins);
       sanitizeCustomizationUnlocks();
       saveRobotConfig();
     }
+    grantCoins(coinReward);
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;' +
       'align-items:center;justify-content:center;background:rgba(5,8,16,0.95);gap:24px;';
@@ -3145,6 +3590,7 @@
       </div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(220,240,255,0.65);letter-spacing:.12em;text-align:center;max-width:340px;line-height:1.7;">
         ${won ? `VICTOIRES TOTALES : ${progression.wins}` : `VICTOIRES TOTALES : ${getWins()}`}
+        <br>JETONS GAGNES : ${coinReward} CR
         ${won && newUnlocks.length ? `<br>DEBLOQUE : ${newUnlocks.slice(0, 3).join(' • ')}` : ''}
       </div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:10px;max-width:min(92vw,460px);width:100%;
@@ -3806,7 +4252,7 @@
     if ($('cust-piece-stats')) $('cust-piece-stats').textContent = def.stats;
     if ($('cust-piece-style')) $('cust-piece-style').textContent = 'STYLE : ' + style.name + (style.unlockWins > 0 ? ` • ${style.rarity}` : '');
     if (lock) {
-      if (unlockedCount < allCount && nextPieceUnlock) lock.textContent = `${allCount - unlockedCount} VARIANTE(S) BLOQUEE(S) • PROCHAINE A ${nextPieceUnlock.unlockWins} VICTOIRES`;
+      if (unlockedCount < allCount && nextPieceUnlock) lock.textContent = `${allCount - unlockedCount} VARIANTE(S) BLOQUEE(S) • PROCHAINE A ${nextPieceUnlock.unlockWins} VICTOIRES OU EN BOUTIQUE`;
       else lock.textContent = '';
     }
     arrows?.classList.remove('hidden');
@@ -3816,6 +4262,7 @@
 
   function updateCustProgressUI() {
     if ($('cust-wins')) $('cust-wins').textContent = String(getWins());
+    if ($('cust-coins')) $('cust-coins').textContent = String(getCoins());
     if ($('cust-build-name') && $('cust-build-name') !== document.activeElement) $('cust-build-name').value = normalizeBuildName(buildName);
     if ($('cust-unlock-line')) $('cust-unlock-line').textContent = getNextUnlockLabel();
     const host = $('cust-presets');
@@ -4335,6 +4782,12 @@
     setTimeout(() => $('code-input').focus(), 100);
   });
 
+  $('btn-open-shop').addEventListener('click', () => {
+    renderShop();
+    $('view-menu').style.display = 'none';
+    $('view-shop').style.display = 'flex';
+  });
+
   $('btn-start-create').addEventListener('click', () => { isCreator = true; start(); });
 
   $('btn-start-join').addEventListener('click', () => {
@@ -4361,6 +4814,10 @@
     $('view-join').style.display = 'none';
     $('view-menu').style.display  = 'flex';
   });
+  $('btn-back-shop').addEventListener('click', () => {
+    $('view-shop').style.display = 'none';
+    $('view-menu').style.display  = 'flex';
+  });
 
   $('btn-customize').addEventListener('click', () => {
     $('view-menu').style.display      = 'none';
@@ -4381,6 +4838,16 @@
     custRunning = false;
   });
 
+  $('btn-toggle-auth').addEventListener('click', () => {
+    setAuthPanelOpen(!authPanelOpen);
+  });
+  $('btn-auth-login').addEventListener('click', () => { handleAuth('login').catch(err => setAuthStatus(err.message || 'Connexion impossible.', 'error')); });
+  $('btn-auth-signup').addEventListener('click', () => { handleAuth('signup').catch(err => setAuthStatus(err.message || 'Creation impossible.', 'error')); });
+  $('btn-auth-logout').addEventListener('click', () => { handleLogout().catch(err => setAuthStatus(err.message || 'Deconnexion impossible.', 'error')); });
+  $('auth-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') $('btn-auth-login').click();
+  });
+
   // ── Onboarding ────────────────────────────────
   const ONBOARD_KEY = 'robotar_onboarded_v1';
   const showOnboard = () => {
@@ -4395,6 +4862,22 @@
   if (!localStorage.getItem(ONBOARD_KEY)) showOnboard();
   $('btn-onboard-ok').addEventListener('click', hideOnboard);
   $('btn-show-onboard').addEventListener('click', showOnboard);
+  updateMenuIdentityUI();
+  restoreSession().catch(() => {
+    shopItems = getDefaultShopItems();
+    renderShop();
+    setAuthStatus('Mode local actif. Boutique cloud indisponible.', 'error');
+  });
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    authUser = session?.user || null;
+    if (authUser?.email) localStorage.setItem(ROBOT_AUTH_CACHE_KEY, authUser.email);
+    updateMenuIdentityUI();
+    if (authUser) {
+      loadCloudState().then(fetchShopItems).catch(() => {});
+    } else {
+      renderShop();
+    }
+  });
 
   function toggleLandscape() {
     landscapeMode = !landscapeMode;
