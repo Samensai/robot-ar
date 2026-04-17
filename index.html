@@ -38,6 +38,13 @@
       color:var(--cyan); display:flex; align-items:center; gap:6px; }
     #status-dot { width:6px; height:6px; border-radius:50%; background:#aaa; transition:background .3s; }
     #status-dot.active { background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+    #round-score {
+      position:fixed; top:60px; left:50%; transform:translateX(-50%); z-index:25;
+      display:none; align-items:center; gap:10px; padding:8px 14px; border-radius:999px;
+      border:1px solid rgba(0,245,255,0.18); background:rgba(5,12,20,0.78); backdrop-filter:blur(10px);
+      font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; color:rgba(220,245,255,0.84);
+    }
+    #round-score .sep { color:rgba(255,255,255,0.3); }
     /* Stats */
     #stats-hud { position:fixed; top:60px; right:16px; z-index:20;
       font-family:var(--font-mono); font-size:10px; color:rgba(0,245,255,0.6);
@@ -397,6 +404,15 @@
       <span id="status-text">INIT</span>
     </div>
   </div>
+  <div id="round-score">
+    <span id="round-mode">ARENE</span>
+    <span class="sep">|</span>
+    <span id="round-score-me">0</span>
+    <span class="sep">-</span>
+    <span id="round-score-enemy">0</span>
+    <span class="sep">|</span>
+    <span>OBJ <span id="round-target">1</span></span>
+  </div>
 
   <div id="stats-hud" style="display:none">
     <div><span class="stat-label">POS X </span><span id="stat-x">0.00</span></div>
@@ -562,6 +578,15 @@
     <div class="splash-view" id="view-create" style="display:none">
       <p class="mode-note">Partage ce code avec l'autre joueur</p>
       <div id="room-code-display">—</div>
+      <div id="match-target-picker" class="menu-panel" style="margin:0 0 18px 0;">
+        <div class="cust-panel-title" style="color:rgba(0,245,255,0.7);margin-bottom:10px;">OBJECTIF DE MANCHE</div>
+        <div class="inline-actions">
+          <button class="btn-splash-sec match-target-btn" data-target="1" type="button">1</button>
+          <button class="btn-splash-sec match-target-btn" data-target="3" type="button">3</button>
+          <button class="btn-splash-sec match-target-btn" data-target="5" type="button">5</button>
+          <button class="btn-splash-sec match-target-btn" data-target="10" type="button">10</button>
+        </div>
+      </div>
       <button class="btn-splash-primary" id="btn-start-create">[ DÉMARRER ]</button>
       <button class="btn-splash-back" id="btn-back-create">← Retour</button>
     </div>
@@ -618,6 +643,13 @@
 
   // Room : défini quand le joueur crée ou rejoint une partie
   let roomId = null;
+  let targetWins = 1;
+  let roundScore = { creator: 0, joiner: 0 };
+  let roundNumber = 1;
+  let metaCountdownAt = 0;
+  let lastMetaPhase = '';
+  let localRoundOutcome = null;
+  let roundResolved = false;
 
   const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O/1/I/L
   function genCode() {
@@ -2686,14 +2718,123 @@
     });
   }
 
+  function renderTargetPicker() {
+    document.querySelectorAll('.match-target-btn').forEach(btn => {
+      const active = Number(btn.dataset.target) === targetWins;
+      btn.classList.toggle('active', active);
+      btn.style.borderColor = active ? 'rgba(0,245,255,0.62)' : '';
+      btn.style.background = active ? 'rgba(0,245,255,0.08)' : '';
+    });
+  }
+
+  function getSpawnState(creatorSide) {
+    const offset = 2.45;
+    const x = creatorSide ? -offset : offset;
+    const z = creatorSide ? offset : -offset;
+    return {
+      x,
+      z,
+      ry: Math.atan2(-x, -z),
+      camX: x * 0.62,
+      camZ: z * 1.1
+    };
+  }
+
+  function updateRoundHud() {
+    if ($('round-target')) $('round-target').textContent = String(targetWins);
+    if ($('round-score-me')) $('round-score-me').textContent = String(isCreator ? roundScore.creator : roundScore.joiner);
+    if ($('round-score-enemy')) $('round-score-enemy').textContent = String(isCreator ? roundScore.joiner : roundScore.creator);
+  }
+
+  function applySpawnState(creatorSide, keepHP = false) {
+    const spawn = getSpawnState(creatorSide);
+    camSide = creatorSide ? 1 : -1;
+    CAM_FIXED.x = spawn.camX;
+    CAM_FIXED.z = spawn.camZ;
+    robotPos.x = spawn.x;
+    robotPos.z = spawn.z;
+    robotPos.ry = spawn.ry;
+    camYaw = spawn.ry;
+    jumpY = 0;
+    jumpVel = 0;
+    pushVelX = 0;
+    pushVelZ = 0;
+    arenaDriftX = 0;
+    arenaDriftZ = 0;
+    specialFx = null;
+    localHazards = [];
+    consumedRemoteHazards.clear();
+    invisUntil = 0;
+    shieldUntil = 0;
+    stunUntil = 0;
+    attackAnim = null;
+    attackCooldown = 0;
+    specialCooldown = 0;
+    specialReadyPending = false;
+    if (!keepHP) myHP = myMaxHP;
+    if (robotGroup) {
+      robotGroup.visible = true;
+      robotGroup.position.set(robotPos.x, 0, robotPos.z);
+      robotGroup.rotation.set(0, robotPos.ry, 0);
+    }
+    updateHPBars();
+  }
+
+  function resetRoundState(keepHP = false) {
+    deathSequenceStarted = false;
+    endSequence = null;
+    matchStarted = false;
+    localRoundOutcome = null;
+    roundResolved = false;
+    applySpawnState(isCreator, keepHP);
+    publishImmediate();
+  }
+
+  async function resolveRoundStyle() {
+    if (!roomId) return;
+    const metaRef = db.ref('rooms/' + roomId + '/meta');
+    await metaRef.transaction(meta => {
+      if (!meta || meta.phase === 'ended') return meta;
+      if (meta.phase === 'resolving' || meta.roundNumber !== roundNumber) return meta;
+      const side = isCreator ? 'creator' : 'joiner';
+      const next = { ...(meta || {}) };
+      next.creatorScore = Number(next.creatorScore || 0);
+      next.joinerScore = Number(next.joinerScore || 0);
+      next[side + 'Score'] += 1;
+      next.winnerSide = side;
+      if (next[side + 'Score'] >= Number(next.targetWins || 1)) {
+        next.phase = 'ended';
+        next.finalWinner = side;
+      } else {
+        next.phase = 'countdown';
+        next.roundNumber = Number(next.roundNumber || 1) + 1;
+        next.countdownAt = Date.now() + 3500;
+      }
+      return next;
+    });
+  }
+
   async function resolveArenaStyle() {
     if (isCreator) {
       arenaStyle = selectedArenaStyle;
-      await db.ref('rooms/' + roomId + '/meta').update({ arenaStyle });
+      await db.ref('rooms/' + roomId + '/meta').update({
+        mode: 'arena',
+        arenaStyle,
+        targetWins,
+        creatorScore: 0,
+        joinerScore: 0,
+        roundNumber: 1,
+        phase: 'waiting',
+        countdownAt: 0,
+        finalWinner: null,
+        winnerSide: null
+      });
       return;
     }
-    const snap = await db.ref('rooms/' + roomId + '/meta/arenaStyle').get();
-    arenaStyle = snap.exists() ? snap.val() : 'neon-grid';
+    const snap = await db.ref('rooms/' + roomId + '/meta').get();
+    const meta = snap.val() || {};
+    arenaStyle = meta.arenaStyle || 'neon-grid';
+    targetWins = Number(meta.targetWins || 1);
   }
 
   //  ROBOT DISTANT
@@ -2904,6 +3045,7 @@
     $('stat-room').textContent = roomId;
 
     const playersRef = db.ref('rooms/' + roomId + '/players');
+    const metaRef = db.ref('rooms/' + roomId + '/meta');
 
     playersRef.on('value', snap => {
       const all = snap.val() || {};
@@ -2995,21 +3137,41 @@
         }
       });
 
+      if (isCreator && Object.keys(all).length >= 2) {
+        metaRef.transaction(meta => {
+          if (!meta) return meta;
+          if ((meta.phase || 'waiting') === 'waiting') {
+            return { ...meta, phase: 'countdown', countdownAt: Date.now() + 3500 };
+          }
+          return meta;
+        });
+      }
+
       $('stat-players').textContent = Object.keys(all).length + '/2';
 
-      // Creator writes startAt when both players connected
-      if (isCreator && Object.keys(all).length >= 2) {
-        const saRef = db.ref('rooms/' + roomId + '/startAt');
-        saRef.once('value', s => { if (!s.exists()) saRef.set(Date.now() + 3500); });
-      }
+      if (Object.keys(all).length < 2) matchStarted = false;
     });
 
-    // Listen to startAt for countdown
-    let countdownTriggered = false;
-    db.ref('rooms/' + roomId + '/startAt').on('value', snap => {
-      if (!snap.exists() || countdownTriggered) return;
-      const sa = snap.val();
-      if (sa - Date.now() > -500) { countdownTriggered = true; showCountdown(sa); }
+    metaRef.on('value', snap => {
+      const meta = snap.val() || {};
+      targetWins = Number(meta.targetWins || targetWins || 1);
+      roundScore.creator = Number(meta.creatorScore || 0);
+      roundScore.joiner = Number(meta.joinerScore || 0);
+      roundNumber = Number(meta.roundNumber || 1);
+      updateRoundHud();
+      const phase = meta.phase || '';
+      if ($('round-score')) $('round-score').style.display = phase ? 'flex' : 'none';
+      if (phase === 'countdown' && meta.countdownAt && meta.countdownAt !== metaCountdownAt) {
+        metaCountdownAt = meta.countdownAt;
+        const keepHP = localRoundOutcome === 'won';
+        resetRoundState(keepHP);
+        showCountdown(meta.countdownAt);
+      }
+      if (phase === 'ended' && meta.finalWinner && !gameOver) {
+        const won = meta.finalWinner === (isCreator ? 'creator' : 'joiner');
+        endGame(won);
+      }
+      lastMetaPhase = phase;
     });
 
     // Solo fallback: unlock controls after 10s if no opponent
@@ -3533,6 +3695,8 @@
       endGame(won);
       return;
     }
+    matchStarted = false;
+    localRoundOutcome = won ? 'won' : 'lost';
     const enemy = Object.values(remoteRobots)[0] || null;
     const winnerGroup = won ? robotGroup : (enemy?.group || null);
     endSequence = {
@@ -3549,13 +3713,16 @@
     spawnExplosionBurst(pos, won ? 0x00f5ff : 0xff5533);
     playSound(won ? 'victory' : 'defeat');
     group.visible = false;
-    setTimeout(() => endGame(won), 3000);
+    setTimeout(() => {
+      if (won) resolveRoundStyle().catch(() => {});
+    }, 3000);
   }
 
   function endGame(won) {
     if (gameOver) return;
     gameOver = true;
     endSequence = null;
+    $('round-score').style.display = 'none';
     const prevWins = getWins();
     const coinReward = won ? 120 : 45;
     let newUnlocks = [];
@@ -3798,12 +3965,10 @@
     custRunning = false; // arrêter le rendu du customiseur
     $('splash').classList.add('hidden');
     await resolveArenaStyle();
-    camSide = isCreator ? 1 : -1;
-    CAM_FIXED.z = 3.6 * camSide;
-    robotPos.x = 0;
-    robotPos.z = 2.5 * camSide;
-    robotPos.ry = isCreator ? Math.PI : 0;
-    camYaw = isCreator ? 0 : Math.PI;
+    roundScore = { creator: 0, joiner: 0 };
+    roundNumber = 1;
+    updateRoundHud();
+    applySpawnState(isCreator, false);
     myMaxHP = calcMaxHP();
     myHP = myMaxHP;
     endSequence = null;
@@ -3823,6 +3988,7 @@
     setupFirebase();
     // Show game UI
     $('game-controls').style.display = 'flex';
+    $('round-score').style.display = 'flex';
     $('btn-special').style.display = 'flex';
     $('btn-attack').style.display = 'flex';
     $('btn-attack').classList.add('ready');
@@ -4771,9 +4937,18 @@
   $('btn-create').addEventListener('click', () => {
     roomId = genCode();
     renderArenaPicker();
+    renderTargetPicker();
     $('room-code-display').textContent = roomId;
     $('view-menu').style.display  = 'none';
     $('view-create').style.display = 'flex';
+  });
+
+  document.querySelectorAll('.match-target-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      targetWins = Number(btn.dataset.target || 1);
+      renderTargetPicker();
+      updateRoundHud();
+    });
   });
 
   $('btn-show-join').addEventListener('click', () => {
@@ -4862,6 +5037,8 @@
   if (!localStorage.getItem(ONBOARD_KEY)) showOnboard();
   $('btn-onboard-ok').addEventListener('click', hideOnboard);
   $('btn-show-onboard').addEventListener('click', showOnboard);
+  renderTargetPicker();
+  updateRoundHud();
   updateMenuIdentityUI();
   restoreSession().catch(() => {
     shopItems = getDefaultShopItems();
