@@ -493,12 +493,32 @@
       <button class="btn-splash-primary" id="btn-onboard-ok" style="margin-top:20px;">[ COMPRIS ! ]</button>
     </div>
 
+    <div class="splash-view" id="view-auth">
+      <div class="menu-panel" style="margin-bottom:18px;">
+        <div class="menu-meta-grid">
+          <div class="menu-meta-label">ACCÈS</div>
+          <div class="menu-meta-value">COMPTE REQUIS</div>
+          <div class="menu-meta-label">MODE</div>
+          <div class="menu-meta-value">EMAIL + MOT DE PASSE</div>
+        </div>
+      </div>
+      <div class="auth-panel" id="auth-panel">
+        <input id="auth-email" class="field-input" type="email" inputmode="email" autocomplete="email" placeholder="EMAIL"/>
+        <input id="auth-password" class="field-input" type="password" autocomplete="current-password" placeholder="MOT DE PASSE"/>
+        <div class="inline-actions">
+          <button class="btn-splash-primary" id="btn-auth-login" type="button">[ SE CONNECTER ]</button>
+          <button class="btn-splash-sec" id="btn-auth-signup" type="button">Créer un compte</button>
+        </div>
+        <div class="status-line" id="auth-status"></div>
+      </div>
+    </div>
+
     <!-- Vue 1 : menu principal -->
-    <div class="splash-view" id="view-menu">
+    <div class="splash-view" id="view-menu" style="display:none">
       <div class="menu-panel">
         <div class="menu-meta-grid">
           <div class="menu-meta-label">COMPTE</div>
-          <div class="menu-meta-value" id="menu-auth-state">HORS LIGNE</div>
+          <div class="menu-meta-value" id="menu-auth-state">CONNECTE</div>
           <div class="menu-meta-label">EMAIL</div>
           <div class="menu-meta-value" id="menu-auth-email">INVITE</div>
           <div class="menu-meta-label">JETONS</div>
@@ -509,18 +529,8 @@
       <button class="btn-splash-primary" id="btn-create">[ CRÉER UNE PARTIE ]</button>
       <button class="btn-splash-sec" id="btn-open-shop">Boutique →</button>
       <button class="btn-splash-sec" id="btn-show-join">Rejoindre une partie →</button>
-      <button class="btn-splash-sec" id="btn-toggle-auth">Compte / Connexion →</button>
       <button class="btn-splash-back" id="btn-show-onboard" style="margin-top:16px;">? CONTRÔLES</button>
-      <div class="auth-panel hidden" id="auth-panel">
-        <input id="auth-email" class="field-input" type="email" inputmode="email" autocomplete="email" placeholder="EMAIL"/>
-        <input id="auth-password" class="field-input" type="password" autocomplete="current-password" placeholder="MOT DE PASSE"/>
-        <div class="inline-actions">
-          <button class="btn-splash-primary" id="btn-auth-login" type="button">[ SE CONNECTER ]</button>
-          <button class="btn-splash-sec" id="btn-auth-signup" type="button">Créer un compte</button>
-        </div>
-        <button class="btn-splash-back" id="btn-auth-logout" type="button" style="display:none;margin-top:0;">SE DECONNECTER</button>
-        <div class="status-line" id="auth-status"></div>
-      </div>
+      <button class="btn-splash-back" id="btn-auth-logout" type="button" style="margin-top:6px;">SE DECONNECTER</button>
     </div>
 
     <!-- Vue personnalisation plein écran -->
@@ -1898,12 +1908,11 @@
   }
 
   function updateMenuIdentityUI() {
-    if ($('menu-auth-state')) $('menu-auth-state').textContent = authUser ? 'CONNECTE' : 'LOCAL';
+    if ($('menu-auth-state')) $('menu-auth-state').textContent = authUser ? 'CONNECTE' : 'VERROUILLE';
     if ($('menu-auth-email')) $('menu-auth-email').textContent = getDisplayEmail();
     if ($('menu-coins')) $('menu-coins').textContent = String(getCoins());
     if ($('shop-coins')) $('shop-coins').textContent = String(getCoins());
     if ($('shop-auth-email')) $('shop-auth-email').textContent = getDisplayEmail();
-    if ($('btn-auth-logout')) $('btn-auth-logout').style.display = authUser ? 'block' : 'none';
     if ($('shop-subtitle')) {
       $('shop-subtitle').textContent = authUser
         ? 'Achète des pièces et des skins avec tes jetons cloud.'
@@ -1911,10 +1920,21 @@
     }
   }
 
-  function setAuthPanelOpen(open) {
-    authPanelOpen = !!open;
-    $('auth-panel')?.classList.toggle('hidden', !authPanelOpen);
-    $('btn-toggle-auth')?.classList.toggle('active', authPanelOpen);
+  function setSplashView(viewId) {
+    ['view-auth', 'view-menu', 'view-customize', 'view-create', 'view-join', 'view-shop', 'view-onboard'].forEach(id => {
+      const el = $(id);
+      if (el) el.style.display = id === viewId ? 'flex' : 'none';
+    });
+  }
+
+  function showAuthGate() {
+    authPanelOpen = true;
+    setSplashView('view-auth');
+  }
+
+  function showMainMenu() {
+    authPanelOpen = false;
+    setSplashView('view-menu');
   }
 
   function getOwnedInventoryRows() {
@@ -2040,9 +2060,11 @@
       await loadCloudState();
       await fetchShopItems();
       setAuthStatus(`Connecte: ${authUser.email}`, 'ok');
+      showMainMenu();
     } else {
       shopItems = getDefaultShopItems();
       renderShop();
+      showAuthGate();
     }
   }
 
@@ -2067,6 +2089,7 @@
     if (mode === 'signup' && !data.session) {
       updateMenuIdentityUI();
       setAuthStatus('Compte cree. Confirme ton email si Supabase exige la verification.', 'ok');
+      showAuthGate();
       return;
     }
     await loadCloudState().catch(() => {});
@@ -2074,6 +2097,7 @@
     await pushCloudState().catch(() => {});
     updateMenuIdentityUI();
     setAuthStatus(mode === 'signup' ? 'Compte cree et synchronise.' : 'Connexion reussie.', 'ok');
+    showMainMenu();
   }
 
   async function handleLogout() {
@@ -2081,6 +2105,7 @@
     authUser = null;
     updateMenuIdentityUI();
     setAuthStatus('Session fermee. Progression locale conservee.', '');
+    showAuthGate();
   }
 
   function renderShop() {
@@ -2124,9 +2149,7 @@
       if (!authUser && !owned && !naturallyUnlocked) buyBtn.disabled = false;
       buyBtn.addEventListener('click', async () => {
         if (!authUser) {
-          setAuthPanelOpen(true);
-          $('view-shop').style.display = 'none';
-          $('view-menu').style.display = 'flex';
+          showAuthGate();
           setAuthStatus('Connecte-toi pour acheter et synchroniser.', '');
           return;
         }
@@ -2728,15 +2751,15 @@
   }
 
   function getSpawnState(creatorSide) {
-    const offset = 2.45;
+    const offset = ARENA - ROBOT_RADIUS;
     const x = creatorSide ? -offset : offset;
     const z = creatorSide ? offset : -offset;
     return {
       x,
       z,
       ry: Math.atan2(-x, -z),
-      camX: x * 0.62,
-      camZ: z * 1.1
+      camX: x * 0.9,
+      camZ: z * 1.02
     };
   }
 
@@ -5008,14 +5031,10 @@
   });
 
   $('btn-back-cust').addEventListener('click', () => {
-    $('view-customize').style.display = 'none';
-    $('view-menu').style.display      = 'flex';
+    showMainMenu();
     custRunning = false;
   });
 
-  $('btn-toggle-auth').addEventListener('click', () => {
-    setAuthPanelOpen(!authPanelOpen);
-  });
   $('btn-auth-login').addEventListener('click', () => { handleAuth('login').catch(err => setAuthStatus(err.message || 'Connexion impossible.', 'error')); });
   $('btn-auth-signup').addEventListener('click', () => { handleAuth('signup').catch(err => setAuthStatus(err.message || 'Creation impossible.', 'error')); });
   $('btn-auth-logout').addEventListener('click', () => { handleLogout().catch(err => setAuthStatus(err.message || 'Deconnexion impossible.', 'error')); });
@@ -5026,15 +5045,13 @@
   // ── Onboarding ────────────────────────────────
   const ONBOARD_KEY = 'robotar_onboarded_v1';
   const showOnboard = () => {
-    $('view-menu').style.display    = 'none';
-    $('view-onboard').style.display = 'flex';
+    setSplashView('view-onboard');
   };
   const hideOnboard = () => {
     localStorage.setItem(ONBOARD_KEY, '1');
-    $('view-onboard').style.display = 'none';
-    $('view-menu').style.display    = 'flex';
+    if (authUser) showMainMenu();
+    else showAuthGate();
   };
-  if (!localStorage.getItem(ONBOARD_KEY)) showOnboard();
   $('btn-onboard-ok').addEventListener('click', hideOnboard);
   $('btn-show-onboard').addEventListener('click', showOnboard);
   renderTargetPicker();
@@ -5043,16 +5060,18 @@
   restoreSession().catch(() => {
     shopItems = getDefaultShopItems();
     renderShop();
-    setAuthStatus('Mode local actif. Boutique cloud indisponible.', 'error');
+    showAuthGate();
+    setAuthStatus('Connexion cloud indisponible pour le moment.', 'error');
   });
   supabaseClient.auth.onAuthStateChange((_event, session) => {
     authUser = session?.user || null;
     if (authUser?.email) localStorage.setItem(ROBOT_AUTH_CACHE_KEY, authUser.email);
     updateMenuIdentityUI();
     if (authUser) {
-      loadCloudState().then(fetchShopItems).catch(() => {});
+      loadCloudState().then(fetchShopItems).then(showMainMenu).catch(() => {});
     } else {
       renderShop();
+      showAuthGate();
     }
   });
 
