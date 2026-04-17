@@ -330,6 +330,16 @@
       text-shadow:0 0 50px currentColor, 0 0 100px currentColor;
       color:#fff; transition:transform 0.1s ease-out, color 0.15s;
       transform:scale(1); }
+    /* Onboarding */
+    #onboard-grid {
+      display:grid; grid-template-columns:repeat(2,1fr); gap:9px;
+      width:100%; max-width:320px; margin-bottom:4px; }
+    .onboard-card {
+      background:rgba(0,245,255,0.04); border:1px solid rgba(0,245,255,0.13);
+      border-radius:8px; padding:11px 10px; text-align:center; }
+    .onboard-icon { font-size:20px; margin-bottom:5px; line-height:1; }
+    .onboard-lbl { font-size:8px; letter-spacing:.16em; color:rgba(0,245,255,0.65); margin-bottom:3px; }
+    .onboard-desc { font-size:10px; color:rgba(200,220,255,0.6); line-height:1.45; }
   </style>
 </head>
 <body>
@@ -389,11 +399,50 @@
     <div class="splash-title">ROBOT::AR</div>
     <div class="splash-sub">Prototype v0.2 — Modulaire</div>
 
+    <!-- Vue onboarding (premier lancement) -->
+    <div class="splash-view" id="view-onboard" style="display:none">
+      <div style="font-size:10px;letter-spacing:.2em;color:rgba(0,245,255,0.6);margin-bottom:16px;">GUIDE RAPIDE</div>
+      <div id="onboard-grid">
+        <div class="onboard-card">
+          <div class="onboard-icon">◎</div>
+          <div class="onboard-lbl">JOYSTICK</div>
+          <div class="onboard-desc">Déplacer le robot</div>
+        </div>
+        <div class="onboard-card">
+          <div class="onboard-icon" style="color:#ff4422">⬤</div>
+          <div class="onboard-lbl">ATTAQUE</div>
+          <div class="onboard-desc">Grand bouton rouge — frappe au contact</div>
+        </div>
+        <div class="onboard-card">
+          <div class="onboard-icon" style="color:#00f5ff">◈</div>
+          <div class="onboard-lbl">CAPACITÉ SP</div>
+          <div class="onboard-desc">Bouton SP — active l'antenne (se recharge)</div>
+        </div>
+        <div class="onboard-card">
+          <div class="onboard-icon" style="color:#7bff6c">▮▯</div>
+          <div class="onboard-lbl">BARRES DE VIE</div>
+          <div class="onboard-desc">La tienne à gauche, l'adversaire à droite</div>
+        </div>
+        <div class="onboard-card">
+          <div class="onboard-icon" style="color:#ffaa44">3·2·1</div>
+          <div class="onboard-lbl">COMPTE À REBOURS</div>
+          <div class="onboard-desc">Attends GO! — les contrôles se débloquent</div>
+        </div>
+        <div class="onboard-card">
+          <div class="onboard-icon">↺</div>
+          <div class="onboard-lbl">MODE PAYSAGE</div>
+          <div class="onboard-desc">Tourne le téléphone pour plus de confort</div>
+        </div>
+      </div>
+      <button class="btn-splash-primary" id="btn-onboard-ok" style="margin-top:20px;">[ COMPRIS ! ]</button>
+    </div>
+
     <!-- Vue 1 : menu principal -->
     <div class="splash-view" id="view-menu">
       <button class="btn-splash-sec" id="btn-customize" style="margin-bottom:14px;">✦ PERSONNALISER →</button>
       <button class="btn-splash-primary" id="btn-create">[ CRÉER UNE PARTIE ]</button>
       <button class="btn-splash-sec" id="btn-show-join">Rejoindre une partie →</button>
+      <button class="btn-splash-back" id="btn-show-onboard" style="margin-top:16px;">? CONTRÔLES</button>
     </div>
 
     <!-- Vue personnalisation plein écran -->
@@ -1706,6 +1755,18 @@
     buildRobotAssembly(robotGroup, pieceStyles);
     robotGroup.position.set(robotPos.x, 0, robotPos.z);
     robotGroup.rotation.y = robotPos.ry;
+    // Range indicator ring (attack fronts only)
+    const fOpt = PIECES.front.options[PIECES.front.current];
+    if (fOpt.mode !== 'deployMine' && fOpt.mode !== 'deployTrap') {
+      const r = fOpt.attackRange || ATTACK_RANGE;
+      const ringGeo = new THREE.RingGeometry(r - 0.055, r, 72, 1);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3311, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.name = 'rangeIndicator';
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.025;
+      robotGroup.add(ring);
+    }
     scene.add(robotGroup);
   }
 
@@ -3543,6 +3604,16 @@
       }
       syncShieldVisual(robotGroup, now < shieldUntil, now);
 
+      // Range indicator fade in/out when attack ready
+      const rangeRing = robotGroup.getObjectByName('rangeIndicator');
+      if (rangeRing) {
+        const wantOpacity = (matchStarted && !gameOver && now >= attackCooldown && now >= invisUntil)
+          ? 0.22 + Math.sin(now * 0.005) * 0.1
+          : 0;
+        rangeRing.material.opacity += (wantOpacity - rangeRing.material.opacity) * 0.12;
+        rangeRing.visible = rangeRing.material.opacity > 0.008;
+      }
+
       $('stat-x').textContent=robotPos.x.toFixed(2);
       $('stat-z').textContent=robotPos.z.toFixed(2);
       $('stat-r').textContent=Math.round(THREE.MathUtils.radToDeg(robotPos.ry)%360)+'°';
@@ -4309,6 +4380,21 @@
     $('view-menu').style.display      = 'flex';
     custRunning = false;
   });
+
+  // ── Onboarding ────────────────────────────────
+  const ONBOARD_KEY = 'robotar_onboarded_v1';
+  const showOnboard = () => {
+    $('view-menu').style.display    = 'none';
+    $('view-onboard').style.display = 'flex';
+  };
+  const hideOnboard = () => {
+    localStorage.setItem(ONBOARD_KEY, '1');
+    $('view-onboard').style.display = 'none';
+    $('view-menu').style.display    = 'flex';
+  };
+  if (!localStorage.getItem(ONBOARD_KEY)) showOnboard();
+  $('btn-onboard-ok').addEventListener('click', hideOnboard);
+  $('btn-show-onboard').addEventListener('click', showOnboard);
 
   function toggleLandscape() {
     landscapeMode = !landscapeMode;
